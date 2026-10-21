@@ -1,7 +1,8 @@
 # Porting a Raylib-cs game to Rayforge
 
-Draft guide. It will be validated in M3 by porting DoomFire-Raylib, then in M6 by porting Wolfrender.
-Status: **not yet tested against a real port**.
+Validated in M3 by porting DoomFire-Raylib ([spike 0003](spikes/0003-doomfire-port.md)). Wolfrender remains
+the large case in M6.
+Status: **validated against DoomFire** (2026-10-21).
 
 ---
 
@@ -169,6 +170,9 @@ DesktopRunner.Run<MyGame>(new()
 - Add `Assets.props` (see `PLAN.md` section 4.6) and import it from both hosts.
 - Test the desktop host first: it proves the paths and the game logic without browser variables.
 - On web, start with **Bundled** mode. Switch to **Preload** only if startup time/memory demands it.
+- **Text-like assets need a known MIME type on the Blazor DevServer.** `.frag` / `.vert` / `.glsl` return
+  HTTP 404 from ASP.NET StaticFiles. Prefer a `.txt` suffix (`fire_present.frag.txt`) or another mapped
+  type. Plain static hosts (nginx, GitHub Pages) serve unknown extensions; DevServer does not.
 
 ### Step 5 - Run desktop, then web
 
@@ -219,12 +223,15 @@ Go through this list before declaring the port done.
 
 ### Rendering
 
-- [ ] Shaders use GLSL ES (`#version 100` or `300 es`) on web; desktop GLSL 330 variants are behind a
-      runtime/compile branch.
-- [ ] No `#if BROWSER` in the game assembly if avoidable; prefer a uniform shader or a runtime choice.
+- [ ] Shaders use GLSL ES **100** on web with the current Raylib-cs 8.1.0 `browser-wasm` archive (WebGL 1).
+      Desktop stays on GLSL 330. Select the folder at runtime (`Context.IsBrowser`); do not use `#if BROWSER`.
+- [ ] Do **not** assume `#version 300 es` works until a package build confirms WebGL 2.
+- [ ] GLSL ES 100: no `textureSize()` (pass a size uniform), no `texture()` (use `texture2D`), no
+      `in`/`out` (use `attribute`/`varying`), no `round()` (use `floor(x + 0.5)`), no dynamic indexing of
+      uniform arrays in fragment shaders (loop with the loop variable as the index).
 - [ ] Render textures / `BeginTextureMode` work at the logical size; check for upside-down output on web.
 - [ ] `GetScreenWidth/Height` is read when drawing or after `OnResize`, not cached forever.
-- [ ] Fullscreen uses `Context.Runtime.ToggleFullscreen`, not `ConfigFlags`.
+- [ ] Fullscreen uses `Context.Runtime.ToggleFullscreen`, not `ConfigFlags` / auto-`ToggleFullscreen` at boot.
 - [ ] Screenshots (if any) are downloaded via JS; MEMFS files disappear.
 
 ### Audio
@@ -234,6 +241,7 @@ Go through this list before declaring the port done.
 - [ ] Music/sounds are preloaded; no streaming from HTTP.
 - [ ] OGG/WAV/MP3 only; check licenses and file sizes.
 - [ ] No audio-thread assumptions (callbacks) unless tested on web.
+- [ ] Silent games may set `EnableAudio=false` and `RequireUserGesture=false` for an instant start.
 
 ### Assets and IO
 
@@ -243,6 +251,7 @@ Go through this list before declaring the port done.
 - [ ] Writes go to MEMFS (lost on reload) or browser storage via JS.
 - [ ] Asset sizes are known; initial memory stays within `INITIAL_MEMORY` + growth.
 - [ ] Fonts are licensed and loaded via `assets/...`.
+- [ ] Shader / other text assets use a DevServer-safe extension (see Step 4).
 
 ### Data and .NET
 
@@ -263,26 +272,35 @@ Go through this list before declaring the port done.
 
 ---
 
-## 3. Worked example: DoomFire-Raylib (M3)
+## 3. Worked example: DoomFire-Raylib (M3) - done
 
-`~/Work/DoomFire-Raylib` is a small raylib game/effect with a shader. It is the first real port because it
-exercises:
+`~/Work/DoomFire-Raylib` is a small raylib fire effect with custom shaders. It was the first real port
+because it exercises a blocking loop, fullscreen, `GetRenderWidth/Height`, and GLSL - with no server,
+editor or large asset set.
 
-- `InitWindow` + a game loop;
-- shader loading (GLSL variants);
-- a full-screen quad / render texture;
-- timing and input;
-- no server, editor or large asset set.
+**Ported to** [`games/DoomFire/`](../games/DoomFire). Evidence: [spike 0003](spikes/0003-doomfire-port.md).
 
-Expected work:
+| Area | Change |
+|---|---|
+| Project split | `App/DoomFireHost` + `Fire/*` -> `DoomFire.Game`; thin `.Web` / `.Desktop` hosts |
+| Lifecycle | `InitWindow` / `while` / `CloseWindow` / `SetTargetFPS` / boot `ToggleFullscreen` removed |
+| Timing | `GetFrameTime()` -> `Update(dt)` |
+| Quit / fullscreen | `Escape` -> `Context.Runtime.RequestQuit()`; `F` -> `ToggleFullscreen` |
+| Canvas | `CanvasScaleMode.Fill` (original read `GetRenderWidth/Height` every frame) |
+| Audio | none; `EnableAudio=false`, `RequireUserGesture=false` |
+| Shaders | embedded GLSL 330 -> `Assets/shaders/gl330/*.txt` + `es100/*.txt`; pick by `IsBrowser` |
+| Assets | Bundled only (~6 KB of shaders); Preload groups not needed |
+| Pointer lock | not used; spike 0004 deferred |
 
-1. Move `Fire/` and `App/DoomFireHost.cs` into `DoomFire.Game`.
-2. Convert `DoomFireHost`'s loop into `IGame`.
-3. Move shaders to `Assets/shaders/`; add a GLSL ES variant.
-4. Add the web/desktop hosts.
-5. Record every friction point in `docs/spikes/` and update this guide.
+**Host-specific game changes:** well under 50 lines. The ES 100 shader rewrite is the real porting cost;
+it is asset work, not host coupling.
 
-If DoomFire needs fewer than ~50 lines of host-specific changes, the architecture is doing its job.
+**Friction that the draft guide missed:**
+
+1. Blazor DevServer 404 for `.frag` / `.vert` / `.glsl` (unknown MIME) - use `.txt`.
+2. Raylib-cs 8.1.0 `browser-wasm` is WebGL 1 / `#version 100`, not `#version 300 es`.
+3. ES 100 has no `textureSize()` - pass `heatSize` from C#.
+4. WebGL 1 fragment shaders cannot dynamically index uniform arrays - loop with the loop index.
 
 ---
 
@@ -303,7 +321,7 @@ Known work items:
 | Editor | `Source/Editor`, `rlImGui-cs`, `WebEditor*` -> out of the web build; decide whether to keep a
   desktop-only editor or drop it |
 | Server | `Server/` highscores -> out of scope for a static client; keep as an external service if needed |
-| Shaders | `resources/shaders/*` -> GLSL ES variants |
+| Shaders | `resources/shaders/*` -> GLSL ES **100** variants (same baseline as DoomFire); watch MIME + indexing |
 | Input | verify mouse sensitivity, pointer lock, Escape/Backspace behavior, non-US layouts |
 | UI | options/debug console overlays -> decide: raylib-drawn (portable) or Blazor HTML (web-only) |
 | Tests | `World`/systems can be unit-tested as a plain library once the split is done |
@@ -328,6 +346,9 @@ that gets its own commit and its own checklist ([UPGRADING-RAYLIB.md](UPGRADING-
 | Mouse marker offset | CSS scaling without `SetMouseScale`, or DPR mismatch | Fit mode + `SetMouseScale(backing/css)`; test at DPR 1/2 and zoom |
 | Audio silent / autoplay warning | `InitAudioDevice` before a gesture | Click-to-start; init audio synchronously in the click handler |
 | Assets 404 / `LoadTexture` fails | Not written into MEMFS, wrong case, leading slash | Fetch into MEMFS at boot (spike 0001, 4.1); lowercase relative `assets/...` |
+| Shader / text asset HTTP 404 on DevServer, works on desktop | Unknown MIME (`.frag` / `.vert` / `.glsl`) | Rename to `*.frag.txt` (or map the extension); see spike 0003 |
+| `unsupported shader version 300` | `#version 300 es` on a WebGL 1 / ES 2 raylib build | Use `#version 100` for Raylib-cs 8.1.0 `browser-wasm`; see spike 0003 |
+| `Index expression can only contain const or loop symbols` | Dynamic `palette[index]` in a WebGL 1 fragment shader | Loop `for (int i = 0; i < N; i++) if (i == index) ... palette[i]` |
 | DevServer serves an asset with HTTP 200 and 0 bytes | `Content` item with `Link="wwwroot\..."` but no physical file there | Use the copy-target recipe (spike 0001, 4.2); do not mix it with `Content ... Link` |
 | `InitWindow` works in Debug, crashes in Release | AOT/trimming removed something; exception handling | Enable `WasmEnableExceptionHandling`; add trim roots; test AOT separately |
 | A click never registers | Press and release land in the same frame; raylib samples button state per frame | Hold the button >= 1 frame; do not build UI on sub-frame taps |

@@ -3,12 +3,11 @@
 A small framework for running C# / [Raylib](https://raylib.com) games in the browser with Blazor WebAssembly,
 while keeping the game code itself portable to desktop.
 
-> **Status: M2 done (Hello World).** The same `net10.0` game library runs in the browser and in a native
+> **Status: M3 done (DoomFire port).** The same `net10.0` game library runs in the browser and in a native
 > window: `requestAnimationFrame` -> one synchronous C# frame callback, assets fetched into the Emscripten MEMFS,
-> click-to-play audio unlock, Fit letterboxing that survives `InitWindow` and resizing, DOM fullscreen, and error
-> overlays that replace black screens. The demo (rotating cube, custom font, logo, beep, diagnostics) is shared
-> by both hosts unchanged. M3 ports the first real game. Roadmap and checklists:
-> [docs/MILESTONES.md](docs/MILESTONES.md).
+> Fit/Fill canvas modes, and error overlays that replace black screens. Hello World and DoomFire share the base
+> unchanged; DoomFire validated the porting guide (GLSL ES 100 shaders, Fill mode, no `#if BROWSER`). Next is
+> the template and packages (M4). Roadmap and checklists: [docs/MILESTONES.md](docs/MILESTONES.md).
 
 ## Why
 
@@ -43,19 +42,21 @@ game code (net10.0, Raylib-cs only)  ->  same game on desktop and in the browser
 | [docs/MILESTONES.md](docs/MILESTONES.md) | All milestones M0-M6 with checklists |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Project graph, dependency rules, one-context rule, boot sequences, asset pipeline |
 | [docs/UPGRADING-RAYLIB.md](docs/UPGRADING-RAYLIB.md) | How to upgrade Raylib-cs / native raylib without a spike |
-| [docs/spikes/](docs/spikes/) | Spike records (0001 stack proof, 0002 raylib 8.1.0 upgrade) |
+| [docs/spikes/](docs/spikes/) | Spike records (0001 stack proof, 0002 raylib upgrade, 0003 DoomFire port) |
 | [docs/HELLO-WORLD.md](docs/HELLO-WORLD.md) | The first demo: behavior and acceptance criteria |
 | [docs/PORTING-GUIDE.md](docs/PORTING-GUIDE.md) | Checklist for bringing an existing Raylib-cs game to the web |
 
-## Skeleton (M1)
+## Run
 
 ```bash
 dotnet workload install wasm-tools                       # once
 dotnet build Rayforge.slnx
 dotnet test Rayforge.slnx
 
-dotnet run --project games/HelloWorld/HelloWorld.Web     # canvas + loading/error overlay
-dotnet run --project games/HelloWorld/HelloWorld.Desktop # placeholder game window (needs a display)
+dotnet run --project games/HelloWorld/HelloWorld.Web
+dotnet run --project games/HelloWorld/HelloWorld.Desktop
+dotnet run --project games/DoomFire/DoomFire.Web
+dotnet run --project games/DoomFire/DoomFire.Desktop
 dotnet publish games/HelloWorld/HelloWorld.Web -c Release -o artifacts/hello-world
 ```
 

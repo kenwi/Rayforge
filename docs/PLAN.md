@@ -1,6 +1,6 @@
 # Rayforge - Architecture & Implementation Plan
 
-> Status: **decisions taken, M0 + M0b spikes complete.** Implementation starts at M1 on Raylib-cs 8.1.0.
+> Status: **M0-M3 done.** Framework + Hello World + DoomFire port on Raylib-cs 8.1.0. Next: M4 packages.
 > Date: 2026-10-21
 > Repository: `~/Work/Rayforge` -> `kenwi/Rayforge` (public, MIT)
 > Milestone tracker: [MILESTONES.md](MILESTONES.md)
@@ -862,8 +862,8 @@ for (const path of assets) {
 - Pros: progress UI, selective loading, smaller initial download if groups are deferred. Cons: more moving
   parts.
 
-**Decision:** Bundled for Hello World; add Preload groups in M3 before porting Wolfrender (5 MB of assets).
-`GameOptions.AssetMode` exists from the start so the API does not change.
+**Decision:** Bundled for Hello World and DoomFire (M3; shaders are tiny). Add Preload groups before
+Wolfrender (M6, ~5 MB of assets). `GameOptions.AssetMode` exists so the API does not change.
 
 **Serving the files:** the shared `Assets/` folder must physically exist under the web host's `wwwroot/assets/`
 before the static web asset manifest is resolved, otherwise the DevServer answers `200` with an empty body.
@@ -953,7 +953,7 @@ README.
 | Gamepad | Not guaranteed in the browser | Treat as unsupported in v1 |
 | Reflection-heavy serialization | Trimming/AOT can break it | Prefer source-generated `System.Text.Json` |
 | `Environment.Exit` | Kills the runtime | Use `Context.Runtime.RequestQuit` |
-| Shaders | GLSL ES (`#version 100`/`300 es`) | Select an ES variant at runtime (`Context.IsBrowser`) or ship a uniform shader; avoid `#if BROWSER` in the game library |
+| Shaders | GLSL ES (`#version 100` on Raylib-cs 8.1.0 web; desktop 330) | Select the folder at runtime (`Context.IsBrowser`); avoid `#if BROWSER`. Prefer `.txt` suffixes for DevServer MIME. See spike 0003. |
 | Screenshots | Works into MEMFS | Add a JS download step if needed |
 | `DateTime.Now`, `Stopwatch` | Work | Fine |
 
@@ -1205,15 +1205,15 @@ Full draft: [PORTING-GUIDE.md](PORTING-GUIDE.md). The mechanical sequence:
    `ConfigFlags`, `Environment.Exit` from the game. Use `GameOptions`/`GameContext`.
 4. **Assets:** move to `Assets/`, use `assets/...` relative paths, add `Assets.props`.
 5. **Threads/timers:** remove `Thread.Sleep`/`Task.Run`; use delta time and async state machines.
-6. **Shaders:** add a GLSL ES variant (`#version 100`/`300 es`) behind a `BROWSER` define or a runtime
-   branch.
+6. **Shaders:** add a GLSL ES **100** variant for the current `browser-wasm` archive (WebGL 1), keep
+   desktop on 330, select at runtime via `Context.IsBrowser`. Use DevServer-safe extensions (`.txt`).
 7. **Test desktop first** (fast, debuggable), then the web host.
 8. **Profile** startup, memory and bundle size; choose Bundled vs Preload.
 9. **Add the start overlay** for audio; verify pointer lock if the game needs it.
 10. **Run** the compatibility checklist and the resize/mouse/DPR matrix.
 
-Worked example for M3: **DoomFire-Raylib** (`~/Work/DoomFire-Raylib`) - small, shader-based, no server, no
-editor. It is a better "arbitrary game" test than a second hello world.
+Worked example for M3 (done): **DoomFire-Raylib** -> [`games/DoomFire/`](../games/DoomFire). Small,
+shader-based, no server, no editor. Friction and verdict: [spike 0003](spikes/0003-doomfire-port.md).
 
 Wolfrender is the large case (M6), not the first port. Known blockers:
 
@@ -1234,15 +1234,15 @@ The authoritative tracker, with per-milestone checklists, is [MILESTONES.md](MIL
 |---|---|---|---|
 | **M0 - Spike** | Throwaway Blazor app proving the decided stack. | Renders + audio + assets + letterboxed mouse mapping; DevServer and static publish work; findings written. | **Done 2026-10-21** |
 | **M0b - Upgrade probe** | M0 probe on Raylib-cs 8.1.0, package-provided native archive; upgrade workflow doc. | No undefined symbols; same behaviour; payload measured; `Raylib.props` and the vendored archive deleted. | **Done 2026-10-21** |
-| **M1 - Skeleton** | Solution, 3 framework projects, `IGame`/`GameContext`, host boots to a Razor loading screen, CI build. | `dotnet build` green; dependency rules documented; no game logic. | Next |
-| **M2 - Hello World** | Base canvas component, JS bridge, desktop runner, Hello World game + hosts, assets, audio, resize, error/loading overlays. | All Hello World acceptance criteria pass; same game on desktop and web. | Planned |
-| **M3 - Real port** | Preload/manifest assets, pointer lock/mouse look, diagnostics, DoomFire port. | DoomFire runs on web and desktop; porting guide validated; friction list written. | Planned |
-| **M4 - Template & packages** | `dotnet new rayforge-game`, packable `Rayforge.Core/Web/Desktop`, local feed, docs. | A new game can be created and run from the template without touching the base source. | Planned |
+| **M1 - Skeleton** | Solution, 3 framework projects, `IGame`/`GameContext`, host boots to a Razor loading screen, CI build. | `dotnet build` green; dependency rules documented; no game logic. | **Done 2026-10-21** |
+| **M2 - Hello World** | Base canvas component, JS bridge, desktop runner, Hello World game + hosts, assets, audio, resize, error/loading overlays. | All Hello World acceptance criteria pass; same game on desktop and web. | **Done 2026-10-21** |
+| **M3 - Real port** | DoomFire port; porting guide validated; shader/MIME friction recorded. | DoomFire runs on web and desktop; friction list written. | **Done 2026-10-21** |
+| **M4 - Template & packages** | `dotnet new rayforge-game`, packable `Rayforge.Core/Web/Desktop`, local feed, docs. | A new game can be created and run from the template without touching the base source. | Next |
 | **M5 - CI & deploy** | GitHub Actions publish, Pages deploy, Playwright smoke test, size/time report, AOT measurement. | Green CI on a clean runner; deployed demo URL; smoke test catches a blank canvas. | Planned |
 | **M6 - Wolfrender port** (separate track) | Port Wolfrender onto Rayforge. | Playable in the browser; no Wolfrender-specific code in the base. | Planned |
 
 M0 closed the decision gate; M0b settled the raylib baseline (8.1.0 / raylib 6.0) and absorbed the former M7.
-M1 is the next action.
+M1-M3 are closed; M4 (template and packages) is the next action.
 
 ---
 

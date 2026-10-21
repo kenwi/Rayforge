@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\src\Rayforge.Web\Rayforge.Web.csproj" />
     <ProjectReference Include="..\..\src\Rayforge.Desktop\Rayforge.Desktop.csproj" />
     <ProjectReference Include="..\..\games\HelloWorld\HelloWorld.Game\HelloWorld.Game.csproj" />
+    <ProjectReference Include="..\..\games\DoomFire\DoomFire.Game\DoomFire.Game.csproj" />
   </ItemGroup>
 
 </Project>

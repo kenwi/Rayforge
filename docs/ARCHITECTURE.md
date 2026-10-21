@@ -1,6 +1,6 @@
 # Architecture
 
-The rules that keep one game library runnable on the web and on the desktop. Scope: through M2 (Hello World).
+The rules that keep one game library runnable on the web and on the desktop. Scope: through M3 (DoomFire port).
 The milestone checklists live in [MILESTONES.md](MILESTONES.md); the rationale is in [PLAN.md](PLAN.md).
 
 ## Project graph

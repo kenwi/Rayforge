@@ -1,0 +1,122 @@
+using System.Numerics;
+
+namespace DoomFire.Fire;
+
+/// <summary>
+/// One 37-color flame ramp. Index 0 is cold, index 36 is the heat source.
+/// </summary>
+internal readonly struct FlamePalette
+{
+    public FlamePalette(string name, Vector3[] colors)
+    {
+        Name = name;
+        Colors = colors;
+    }
+
+    public string Name { get; }
+
+    public Vector3[] Colors { get; }
+}
+
+/// <summary>
+/// Flame palettes. Every ramp has the same length so the heat buffer can stay put.
+/// </summary>
+internal static class FirePalette
+{
+    public const int Count = 37;
+    public const int MaxIndex = Count - 1;
+
+    private static readonly Vector3[] Doom =
+    [
+        Rgb(0x07, 0x07, 0x07),
+        Rgb(0x1F, 0x07, 0x07),
+        Rgb(0x2F, 0x0F, 0x07),
+        Rgb(0x47, 0x0F, 0x07),
+        Rgb(0x57, 0x17, 0x07),
+        Rgb(0x67, 0x1F, 0x07),
+        Rgb(0x77, 0x1F, 0x07),
+        Rgb(0x8F, 0x27, 0x07),
+        Rgb(0x9F, 0x2F, 0x07),
+        Rgb(0xAF, 0x3F, 0x07),
+        Rgb(0xBF, 0x47, 0x07),
+        Rgb(0xC7, 0x47, 0x07),
+        Rgb(0xDF, 0x4F, 0x07),
+        Rgb(0xDF, 0x57, 0x07),
+        Rgb(0xDF, 0x57, 0x07),
+        Rgb(0xD7, 0x5F, 0x07),
+        Rgb(0xD7, 0x5F, 0x07),
+        Rgb(0xD7, 0x67, 0x0F),
+        Rgb(0xCF, 0x6F, 0x0F),
+        Rgb(0xCF, 0x77, 0x0F),
+        Rgb(0xCF, 0x7F, 0x0F),
+        Rgb(0xCF, 0x87, 0x17),
+        Rgb(0xC7, 0x87, 0x17),
+        Rgb(0xC7, 0x8F, 0x17),
+        Rgb(0xC7, 0x97, 0x1F),
+        Rgb(0xBF, 0x9F, 0x1F),
+        Rgb(0xBF, 0x9F, 0x1F),
+        Rgb(0xBF, 0xA7, 0x27),
+        Rgb(0xBF, 0xA7, 0x27),
+        Rgb(0xBF, 0xAF, 0x2F),
+        Rgb(0xB7, 0xAF, 0x2F),
+        Rgb(0xB7, 0xB7, 0x2F),
+        Rgb(0xB7, 0xB7, 0x37),
+        Rgb(0xCF, 0xCF, 0x6F),
+        Rgb(0xDF, 0xDF, 0x9F),
+        Rgb(0xEF, 0xEF, 0xC7),
+        Rgb(0xFF, 0xFF, 0xFF),
+    ];
+
+    public static IReadOnlyList<FlamePalette> All { get; } =
+    [
+        new("doom", Doom),
+        new("blue", Ramp(
+            (0, 0x07, 0x07, 0x14),
+            (6, 0x0F, 0x18, 0x60),
+            (14, 0x18, 0x30, 0xC0),
+            (22, 0x20, 0x80, 0xFF),
+            (28, 0x40, 0xC0, 0xFF),
+            (32, 0xA0, 0xE8, 0xFF),
+            (34, 0xE0, 0xF8, 0xFF),
+            (36, 0xFF, 0xFF, 0xFF))),
+        new("green", Ramp(
+            (0, 0x07, 0x0F, 0x07),
+            (6, 0x0F, 0x40, 0x10),
+            (14, 0x18, 0x78, 0x18),
+            (22, 0x40, 0xC0, 0x20),
+            (28, 0xA0, 0xE0, 0x40),
+            (32, 0xD8, 0xF0, 0x80),
+            (34, 0xF0, 0xFF, 0xC0),
+            (36, 0xFF, 0xFF, 0xFF))),
+        new("purple", Ramp(
+            (0, 0x10, 0x07, 0x10),
+            (6, 0x40, 0x10, 0x50),
+            (14, 0x80, 0x18, 0x78),
+            (22, 0xC0, 0x30, 0xC0),
+            (28, 0xF0, 0x60, 0xE0),
+            (32, 0xFF, 0xA0, 0xF0),
+            (34, 0xFF, 0xD8, 0xFF),
+            (36, 0xFF, 0xFF, 0xFF))),
+    ];
+
+    private static Vector3[] Ramp(params (int Index, byte R, byte G, byte B)[] stops)
+    {
+        var colors = new Vector3[Count];
+        for (int i = 0; i < stops.Length - 1; i++)
+        {
+            (int start, byte r0, byte g0, byte b0) = stops[i];
+            (int end, byte r1, byte g1, byte b1) = stops[i + 1];
+            Vector3 from = Rgb(r0, g0, b0);
+            Vector3 to = Rgb(r1, g1, b1);
+            for (int index = start; index <= end; index++)
+            {
+                float t = (index - start) / (float)(end - start);
+                colors[index] = Vector3.Lerp(from, to, t);
+            }
+        }
+
+        return colors;
+    }
+
+    private static Vector3 Rgb(byte r, byte g, byte b) => new(r / 255f, g / 255f, b / 255f);
+}

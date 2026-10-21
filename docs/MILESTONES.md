@@ -13,13 +13,13 @@ Legend: `[x]` done, `[ ]` planned, **(blocked)** needs something external.
 | M0b | Upgrade probe | Raylib-cs 8.1.0 / raylib 6.0 from the package; drop the vendored `raylib.a` | **Done** - 2026-10-21 |
 | M1 | Skeleton | Solution, framework projects, contracts, asset plumbing, CI build | **Done** - 2026-10-21 |
 | M2 | Hello World | Base canvas + JS bridge + desktop runner + demo game on both hosts | **Done** - 2026-10-21 |
-| M3 | First real port | DoomFire-Raylib on web and desktop; porting guide validated | Not started |
+| M3 | First real port | DoomFire-Raylib on web and desktop; porting guide validated | **Done** - 2026-10-21 |
 | M4 | Template & packages | `dotnet new` template, packable framework, local feed | Not started |
 | M5 | CI & deploy | GitHub Actions, Pages deploy, Playwright smoke test, size report | Not started |
 | M6 | Wolfrender port | Separate track: port Wolfrender onto the base | Not started |
 
 M0 was the decision gate and is closed; M0b settled the raylib baseline and removed the former M7. M1 built the
-skeleton; M2 is the next action.
+skeleton; M2 delivered Hello World; M3 validated the porting guide on DoomFire. M4 is the next action.
 
 ---
 
@@ -166,14 +166,38 @@ for relative assets to resolve.
 
 **Goal:** prove the porting guide on a game the framework did not design for.
 **Exit criteria:** DoomFire runs on web and desktop from one `net10.0` game library; friction list written down.
+**Result:** [`games/DoomFire/`](../games/DoomFire), [spike 0003](spikes/0003-doomfire-port.md),
+[PORTING-GUIDE.md](PORTING-GUIDE.md) validated.
 
-- [ ] Extract DoomFire into `games/DoomFire/DoomFire.Game` (no Blazor, no window/loop)
-- [ ] Shaders: GLSL ES variant selected at runtime, not with `#if BROWSER`
-- [ ] Web + desktop hosts, assets under `Assets/`, `Assets.props`
-- [ ] Preload/manifest mode (groups + progress) if asset volume justifies it
-- [ ] Update `PORTING-GUIDE.md` with every real friction point
-- [ ] Confirm the "under ~50 lines of host-specific changes" expectation (or explain why not)
-- [ ] Pointer-lock spike (0004) if any input needs it; otherwise defer to M6
+- [x] Extract DoomFire into `games/DoomFire/DoomFire.Game` (no Blazor, no window/loop)
+- [x] Shaders: GLSL ES 100 / GLSL 330 selected at runtime via `Context.IsBrowser`, not `#if BROWSER`
+- [x] Web + desktop hosts, assets under `Assets/`, `Assets.props`
+- [x] Preload/manifest mode (groups + progress) if asset volume justifies it *(skipped: 8 tiny shader
+      files; Bundled is enough)*
+- [x] Update `PORTING-GUIDE.md` with every real friction point
+- [x] Confirm the "under ~50 lines of host-specific changes" expectation (or explain why not)
+- [x] Pointer-lock spike (0004) if any input needs it; otherwise defer to M6 *(deferred: keyboard-only)*
+
+**Notes:** source was `~/Work/DoomFire-Raylib` (embedded GLSL 330, blocking loop, auto-fullscreen). The
+port keeps `Fire/` as a plain library; hosts only set `GameOptions` (Fill, 960x540, no audio). Shaders live
+under `Assets/shaders/{gl330,es100}/*.txt` and are chosen at runtime.
+
+**Host-specific game changes:** well under 50 lines - split `Main` into `IGame`, `Escape` ->
+`RequestQuit`, `F` -> `ToggleFullscreen`, host `dt` instead of `GetFrameTime`, shader folder from
+`IsBrowser`. The ES 100 shader rewrite is asset work, not host code. Each host `Program.cs` is ~20 lines.
+
+**Friction found (now in the porting guide):** DevServer 404 for unknown MIME (`.frag`/`.vert`);
+Raylib-cs 8.1.0 `browser-wasm` is WebGL 1 / GLSL ES 100 (not 300); no `textureSize()` on ES 100
+(`heatSize` uniform); no dynamic uniform-array indexing in WebGL 1 fragment shaders (loop-index pattern).
+
+**Result:** desktop smoke (shaders compile, fire + HUD, compositor resize). Web DevServer + headless
+Chromium: 8 assets / ~6 KB into MEMFS, `es100` shaders compile, Fill canvas 1280x720, loop runs without a
+start gesture. 27 unit tests pass (dependency rules cover DoomFire.Game).
+
+**Open:** Firefox/Safari unverified; optional DevServer MIME map for `.frag`/`.vert`; WebGL 2 / ES 300 if a
+future Raylib-cs package switches.
+
+**Closed:** 2026-10-21.
 
 ---
 

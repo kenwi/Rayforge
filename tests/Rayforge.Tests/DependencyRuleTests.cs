@@ -14,7 +14,8 @@ public class DependencyRuleTests
     private static readonly Assembly CoreAssembly = typeof(IGame).Assembly;
     private static readonly Assembly WebAssembly = typeof(ServiceCollectionExtensions).Assembly;
     private static readonly Assembly DesktopAssembly = typeof(DesktopRunner).Assembly;
-    private static readonly Assembly GameAssembly = typeof(HelloWorld.HelloWorldGame).Assembly;
+    private static readonly Assembly HelloWorldAssembly = typeof(HelloWorld.HelloWorldGame).Assembly;
+    private static readonly Assembly DoomFireAssembly = typeof(DoomFire.DoomFireGame).Assembly;
 
     private static readonly string[] ForbiddenInCore =
     [
@@ -47,18 +48,27 @@ public class DependencyRuleTests
     }
 
     [Fact]
-    public void Game_does_not_reference_hosts()
+    public void HelloWorld_does_not_reference_hosts()
     {
-        AssertNoReference(GameAssembly, ForbiddenInGame);
+        AssertNoReference(HelloWorldAssembly, ForbiddenInGame);
     }
 
     [Fact]
-    public void Game_references_core_and_raylib()
+    public void HelloWorld_references_core_and_raylib()
     {
-        string[] references = References(GameAssembly);
+        AssertGameReferencesCoreAndRaylib(HelloWorldAssembly);
+    }
 
-        Assert.Contains("Rayforge.Core", references);
-        Assert.Contains("Raylib-cs", references);
+    [Fact]
+    public void DoomFire_does_not_reference_hosts()
+    {
+        AssertNoReference(DoomFireAssembly, ForbiddenInGame);
+    }
+
+    [Fact]
+    public void DoomFire_references_core_and_raylib()
+    {
+        AssertGameReferencesCoreAndRaylib(DoomFireAssembly);
     }
 
     [Fact]
@@ -77,6 +87,14 @@ public class DependencyRuleTests
 
         Assert.Contains("Rayforge.Core", references);
         Assert.DoesNotContain("Rayforge.Web", references);
+    }
+
+    private static void AssertGameReferencesCoreAndRaylib(Assembly assembly)
+    {
+        string[] references = References(assembly);
+
+        Assert.Contains("Rayforge.Core", references);
+        Assert.Contains("Raylib-cs", references);
     }
 
     private static string[] References(Assembly assembly)

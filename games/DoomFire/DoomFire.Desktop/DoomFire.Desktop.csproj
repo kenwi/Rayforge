@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DoomFire.Desktop</RootNamespace>
+    <RayforgeHost>Desktop</RayforgeHost>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Rayforge.Desktop\Rayforge.Desktop.csproj" />
+    <ProjectReference Include="..\DoomFire.Game\DoomFire.Game.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\Assets.props" />
+
+</Project>

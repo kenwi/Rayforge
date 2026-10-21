@@ -1,0 +1,30 @@
+#version 100
+precision mediump float;
+
+varying vec2 fragTexCoord;
+varying vec4 fragColor;
+
+uniform sampler2D texture0;
+uniform vec2 texelStep;
+
+void main()
+{
+    // ES 100 has no float[](...) constructor; list the Gaussian taps explicitly.
+    float w0 = 0.227027;
+    float w1 = 0.1945946;
+    float w2 = 0.1216216;
+    float w3 = 0.054054;
+    float w4 = 0.016216;
+
+    vec3 color = texture2D(texture0, fragTexCoord).rgb * w0;
+    color += texture2D(texture0, fragTexCoord + texelStep * 1.0).rgb * w1;
+    color += texture2D(texture0, fragTexCoord - texelStep * 1.0).rgb * w1;
+    color += texture2D(texture0, fragTexCoord + texelStep * 2.0).rgb * w2;
+    color += texture2D(texture0, fragTexCoord - texelStep * 2.0).rgb * w2;
+    color += texture2D(texture0, fragTexCoord + texelStep * 3.0).rgb * w3;
+    color += texture2D(texture0, fragTexCoord - texelStep * 3.0).rgb * w3;
+    color += texture2D(texture0, fragTexCoord + texelStep * 4.0).rgb * w4;
+    color += texture2D(texture0, fragTexCoord - texelStep * 4.0).rgb * w4;
+
+    gl_FragColor = vec4(color, 1.0);
+}

@@ -11,6 +11,12 @@
     <Project Path="games/HelloWorld/HelloWorld.Web/HelloWorld.Web.csproj" />
   </Folder>
 
+  <Folder Name="/games/DoomFire/">
+    <Project Path="games/DoomFire/DoomFire.Desktop/DoomFire.Desktop.csproj" />
+    <Project Path="games/DoomFire/DoomFire.Game/DoomFire.Game.csproj" />
+    <Project Path="games/DoomFire/DoomFire.Web/DoomFire.Web.csproj" />
+  </Folder>
+
   <Folder Name="/tests/">
     <Project Path="tests/Rayforge.Tests/Rayforge.Tests.csproj" />
   </Folder>

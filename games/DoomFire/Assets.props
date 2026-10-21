@@ -1,0 +1,82 @@
+<Project>
+
+  <!-- Asset plumbing shared by a game's web and desktop hosts.
+
+       The game owns games/<Game>/Assets/**; the hosts import this file. Assets are never referenced
+       in place at runtime:
+         Web     -> copied into wwwroot/assets before static web assets are resolved, so the dev
+                    server and publish serve real bytes (spike 0001: Content+Link serves 200/0 bytes).
+         Desktop -> copied next to the executable, loaded with raylib's normal relative paths.
+
+       The web host also gets rayforge.assets.json, a build-generated list (never edit by hand, never
+       maintain an array in C#). M2 preloads exactly this list into MEMFS. -->
+
+  <PropertyGroup>
+    <RayforgeAssetsDir>$(MSBuildThisFileDirectory)Assets/</RayforgeAssetsDir>
+    <RayforgeAssetMode Condition="'$(RayforgeAssetMode)' == ''">Bundled</RayforgeAssetMode>
+    <RayforgeAssetManifestName>rayforge.assets.json</RayforgeAssetManifestName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <RayforgeAsset Include="$(RayforgeAssetsDir)**/*"
+                   Exclude="$(RayforgeAssetsDir)**/*.md;$(RayforgeAssetsDir)**/licenses/**" />
+    <RayforgeAssetPath Include="@(RayforgeAsset->'assets/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </ItemGroup>
+
+  <!-- Desktop: flat copy next to the app, preserving subfolders. -->
+  <ItemGroup Condition="'$(RayforgeHost)' == 'Desktop'">
+    <Content Include="@(RayforgeAsset)"
+             Link="assets/%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Web: physical copy into wwwroot plus the generated manifest. -->
+  <Target Name="RayforgeSyncWebAssets"
+          Condition="'$(RayforgeHost)' == 'Web'"
+          BeforeTargets="ResolveStaticWebAssetsInputs">
+
+    <PropertyGroup>
+      <_RayforgeWebAssetsDir>$(MSBuildProjectDirectory)/wwwroot/assets/</_RayforgeWebAssetsDir>
+    </PropertyGroup>
+
+    <!-- The directory is generated output (gitignored): wipe it so removed or renamed assets do not linger
+         and get published forever (e.g. a replaced blip.wav). -->
+    <RemoveDir Directories="$(_RayforgeWebAssetsDir)" />
+    <MakeDir Directories="$(_RayforgeWebAssetsDir)" />
+
+    <Copy SourceFiles="@(RayforgeAsset)"
+          DestinationFiles="@(RayforgeAsset->'$(_RayforgeWebAssetsDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+
+    <!-- Normalise to forward slashes: the list is consumed by JS and by the desktop file API. -->
+    <PropertyGroup>
+      <_RayforgeAssetJson>@(RayforgeAssetPath->'&quot;%(Identity)&quot;', ',')</_RayforgeAssetJson>
+      <_RayforgeAssetJson>$(_RayforgeAssetJson.Replace('\', '/'))</_RayforgeAssetJson>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_RayforgeManifestLine Include="[" />
+      <_RayforgeManifestLine Include="  $(_RayforgeAssetJson)" />
+      <_RayforgeManifestLine Include="]" />
+    </ItemGroup>
+
+    <WriteLinesToFile File="$(_RayforgeWebAssetsDir)$(RayforgeAssetManifestName)"
+                      Lines="@(_RayforgeManifestLine)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+
+    <!-- Register the copies as static web assets in this build, after they exist on disk. -->
+    <ItemGroup>
+      <Content Include="wwwroot/assets/**/*" Exclude="@(Content)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Guard rails: the hosts must declare their kind (and the asset mode) before importing this file. -->
+  <Target Name="RayforgeValidateHost" BeforeTargets="Build">
+    <Error Condition="'$(RayforgeHost)' != 'Web' And '$(RayforgeHost)' != 'Desktop'"
+           Text="Set &lt;RayforgeHost&gt; to Web or Desktop before importing Assets.props." />
+    <Error Condition="'$(RayforgeAssetMode)' != 'Bundled' And '$(RayforgeAssetMode)' != 'Preload'"
+           Text="RayforgeAssetMode must be Bundled or Preload (got '$(RayforgeAssetMode)')." />
+  </Target>
+
+</Project>
