@@ -3,10 +3,12 @@
 A small framework for running C# / [Raylib](https://raylib.com) games in the browser with Blazor WebAssembly,
 while keeping the game code itself portable to desktop.
 
-> **Status: M1 done (skeleton).** One `net10.0` game library, a Blazor WASM host and a desktop host compile
-> against hard dependency rules (enforced by tests). The web host boots to a measured, letterboxed canvas with
-> loading/error overlays; the desktop host runs the placeholder game. M2 adds the frame loop and the Hello World
-> demo. Roadmap and checklists: [docs/MILESTONES.md](docs/MILESTONES.md).
+> **Status: M2 done (Hello World).** The same `net10.0` game library runs in the browser and in a native
+> window: `requestAnimationFrame` -> one synchronous C# frame callback, assets fetched into the Emscripten MEMFS,
+> click-to-play audio unlock, Fit letterboxing that survives `InitWindow` and resizing, DOM fullscreen, and error
+> overlays that replace black screens. The demo (rotating cube, custom font, logo, beep, diagnostics) is shared
+> by both hosts unchanged. M3 ports the first real game. Roadmap and checklists:
+> [docs/MILESTONES.md](docs/MILESTONES.md).
 
 ## Why
 

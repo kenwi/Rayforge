@@ -1,7 +1,7 @@
 # Architecture
 
-The rules that keep one game library runnable on the web and on the desktop. Scope: M1 (skeleton). The
-milestone checklists live in [MILESTONES.md](MILESTONES.md); the rationale is in [PLAN.md](PLAN.md).
+The rules that keep one game library runnable on the web and on the desktop. Scope: through M2 (Hello World).
+The milestone checklists live in [MILESTONES.md](MILESTONES.md); the rationale is in [PLAN.md](PLAN.md).
 
 ## Project graph
 
@@ -48,7 +48,7 @@ document is not supported, and a disposed canvas cannot be re-bound. Therefore:
 - Restarting a game means reloading the page. On desktop, `DesktopRunner` creates exactly one window and one
   game instance per process.
 
-## Boot sequences (as of M1)
+## Boot and frame loop
 
 ### Web
 
@@ -56,31 +56,67 @@ document is not supported, and a disposed canvas cannot be re-bound. Therefore:
 wwwroot/index.html
   -> blazor.webassembly.js
   -> Program.cs        AddRayforge<HelloWorldGame>(...)
-  -> App.razor         <RayforgeCanvas />
+  -> App.razor         <ErrorBoundary><RayforgeCanvas /></ErrorBoundary>
   -> RayforgeCanvas.OnAfterRenderAsync
        1. JSHost.ImportAsync("rayforge", "<base>/_content/Rayforge.Web/rayforge.js")
           (absolute URL: a relative one resolves against _framework/)
-       2. rayforge.js init(canvasId)  -> binds Blazor.runtime.Module.canvas, measures the host
-       3. CanvasLayout.Fit(logical, viewport) -> setCanvasCssSize(...)
-       4. GET assets/rayforge.assets.json        (build-generated; see below)
-       5. ready badge, or the error overlay with the exception
+       2. rayforge.js init(canvasId, mode, title) -> binds Blazor.runtime.Module.canvas,
+          installs ResizeObserver/fullscreen/visibility/context-loss listeners, returns host metrics
+       3. CanvasLayout.Fit|Fill(...) -> setCanvasCssSize(...)
+       4. GET assets/rayforge.assets.json, then preload(paths) -> fetch + FS.writeFile into MEMFS
+       5. state ReadyToStart: the "Click to play" button
+       6. click -> InitWindow + InitAudioDevice + game.Initialize  (all inside the gesture)
+       7. RayforgeInterop.Start(handle, "Rayforge.Web", targetFps): resolves the [JSExport]s, starts rAF
+       8. state Running: the overlay is removed; only the game draws
+       9. failure at any step -> state Failed with the exception and a Reload button
 ```
 
-M1 stops after step 5. M2 adds MEMFS asset preload, the `requestAnimationFrame` loop and the synchronous frame
-bridge. The canvas is intentionally black in M1: the badge reports the mode, the asset count and the CSS size.
+Per frame, JS clamps `dt` (0.1 s), skips while the tab is hidden and calls exactly one synchronous export:
+
+```text
+rAF(now) -> RayforgeBridge.UpdateFrame(handle, dt)
+            -> RayforgeCanvas.Tick(dt)
+               -> game.Update(dt); game.Draw();        (exceptions -> stop + overlay + teardown)
+            -> false stops the loop
+```
+
+Resize and fullscreen never touch the backing store math in JS: the `ResizeObserver` calls
+`RayforgeBridge.OnLayoutChanged(handle, hostW, hostH)`; C# recomputes `CanvasLayout`, calls back
+`setCanvasCssSize` (Fit) or `setBackingSize` + `SetWindowSize` + `game.OnResize` (Fill), and applies
+`SetMouseScale`. `InitWindow` assigns its own CSS size, so the layout is re-applied right after it and before
+the first frame.
+
+Teardown: `DisposeAsync` stops the loop, lets the game unload its own resources, closes the audio device and the
+window, then releases the JS binding. Crashes go through the same `Shutdown` and end in the overlay, never in a
+frozen canvas.
 
 ### Desktop
 
 ```text
 Program.cs
   -> DesktopRunner.Run<HelloWorldGame>(options)
+       SetCurrentDirectory(AppContext.BaseDirectory)   (relative "assets/..." paths)
        SetConfigFlags -> InitWindow -> SetExitKey(Null) -> optional InitAudioDevice
        -> DesktopContext -> game.Initialize
        -> loop: Update / Draw, resize polling -> OnResize, mouse delta accumulation
        -> game.Dispose -> CloseAudioDevice -> CloseWindow
 ```
 
-`SetExitKey(Null)` is deliberate: Escape is the game's decision, not the host's.
+`SetExitKey(Null)` is deliberate: Escape is the game's decision, not the host's. Running from the app directory
+makes the assets copied next to the executable resolve regardless of where the IDE or shell started the process.
+
+### Traps encoded in the host
+
+- A Razor class library needs `_Imports.razor` with `@using Microsoft.AspNetCore.Components.Web`; without it
+  `@onclick` compiles to literal markup and the button does nothing.
+- Calling a `[JSImport]` before `JSHost.ImportAsync` succeeded **aborts the .NET runtime** (not a catchable
+  exception). The host tracks `_moduleImported` and never calls into JS before it.
+- `InitWindow` sets the canvas CSS size to the logical size, which destroys the letterbox at any other aspect
+  ratio. Re-apply the layout immediately after `InitWindow`.
+- `<base href="./" />` (not `/`) so the publish works under a sub-path. Everything else resolves against
+  `NavigationManager.BaseUri`/`document.baseURI`.
+- A keydown+keyup inside a single frame is invisible to `IsKeyPressed` (input is sampled once per frame). This
+  matters for automated tests; a human tap is several frames long.
 
 ## Asset pipeline
 
@@ -95,9 +131,12 @@ Assets live once, in `games/<Game>/Assets/`, and are **never loaded in place**. 
 Why not `Content` + `Link` on the web? Spike 0001: the DevServer answers 200 with 0 bytes. The copy target is
 the workaround, and it is why `wwwroot/assets/` is generated output and gitignored.
 
-Why a generated list? So nobody maintains an array in C# or JS. M1 fetches it and reports the count; M2 will
-write exactly those files into MEMFS. `WasmFilesToIncludeInFileSystem` is not used - Blazor ignores it for
-this purpose.
+Why a generated list? So nobody maintains an array in C# or JS. `RayforgeCanvas` fetches it and `rayforge.js`
+writes exactly those files into MEMFS before the game starts. `WasmFilesToIncludeInFileSystem` is not used -
+Blazor ignores it for this purpose.
+
+The web target wipes `wwwroot/assets/` before copying: it is generated, gitignored output, and stale files
+(a replaced `blip.wav`, old `.br` siblings) must not leak into a publish.
 
 ## wasm build flags
 
@@ -115,14 +154,14 @@ In this repo `Directory.Build.targets` imports that file when `RuntimeIdentifier
 `WasmAllowUndefinedSymbols` is deliberately **not** set: an unresolved native symbol must fail the build. That
 is the ABI gate.
 
-## What M1 deliberately does not do
+## What M2 deliberately does not do
 
-- No game loop on the web, no `InitWindow` yet; the desktop loop exists and runs the placeholder game.
-- No asset preload into MEMFS (the manifest is fetched and counted only).
-- No resize observer after boot; the layout is computed once at boot. M2 adds it.
-- No pointer lock, fullscreen or audio on the web.
-- No AOT, no trimming audit beyond the default Release publish.
-- No router, no multiple canvases.
+- No pointer-lock demo: `BrowserMouseCapture` is wired and correct, but the Hello World demo has no
+  first-person camera (stretch goal).
+- No streaming/progress asset mode: everything is preloaded before the first frame (Bundled only).
+- No AOT (M5); the Release publish is trimmed, and the `[JSExport]` surface survives it.
+- No router and no multiple canvases: one raylib context per page, reload to restart.
+- Firefox/Safari unverified (only Chromium is installed on the development machine).
 
 ## Verifying locally
 

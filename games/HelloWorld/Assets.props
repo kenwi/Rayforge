@@ -18,7 +18,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <RayforgeAsset Include="$(RayforgeAssetsDir)**/*" />
+    <RayforgeAsset Include="$(RayforgeAssetsDir)**/*"
+                   Exclude="$(RayforgeAssetsDir)**/*.md;$(RayforgeAssetsDir)**/licenses/**" />
     <RayforgeAssetPath Include="@(RayforgeAsset->'assets/%(RecursiveDir)%(Filename)%(Extension)')" />
   </ItemGroup>
 
@@ -39,9 +40,13 @@
       <_RayforgeWebAssetsDir>$(MSBuildProjectDirectory)/wwwroot/assets/</_RayforgeWebAssetsDir>
     </PropertyGroup>
 
+    <!-- The directory is generated output (gitignored): wipe it so removed or renamed assets do not linger
+         and get published forever (e.g. a replaced blip.wav). -->
+    <RemoveDir Directories="$(_RayforgeWebAssetsDir)" />
+    <MakeDir Directories="$(_RayforgeWebAssetsDir)" />
+
     <Copy SourceFiles="@(RayforgeAsset)"
-          DestinationFiles="@(RayforgeAsset->'$(_RayforgeWebAssetsDir)%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
+          DestinationFiles="@(RayforgeAsset->'$(_RayforgeWebAssetsDir)%(RecursiveDir)%(Filename)%(Extension)')" />
 
     <!-- Normalise to forward slashes: the list is consumed by JS and by the desktop file API. -->
     <PropertyGroup>

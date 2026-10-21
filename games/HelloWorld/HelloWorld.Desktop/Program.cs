@@ -10,6 +10,6 @@ DesktopRunner.Run<HelloWorldGame>(new GameOptions
     ScaleMode = CanvasScaleMode.Fit,
     AssetMode = AssetMode.Bundled,
 
-    // M1 has no sounds; M2 turns this on together with the Hello World beep.
-    EnableAudio = false,
+    // M2 demo: the beep is the audio-unlock proof on the web.
+    EnableAudio = true,
 });

@@ -12,7 +12,7 @@ Legend: `[x]` done, `[ ]` planned, **(blocked)** needs something external.
 | M0 | Spike | Prove Raylib-cs 7.0.2 + `raylib.a` in a fresh Blazor app | **Done** - 2026-10-21 |
 | M0b | Upgrade probe | Raylib-cs 8.1.0 / raylib 6.0 from the package; drop the vendored `raylib.a` | **Done** - 2026-10-21 |
 | M1 | Skeleton | Solution, framework projects, contracts, asset plumbing, CI build | **Done** - 2026-10-21 |
-| M2 | Hello World | Base canvas + JS bridge + desktop runner + demo game on both hosts | Not started |
+| M2 | Hello World | Base canvas + JS bridge + desktop runner + demo game on both hosts | **Done** - 2026-10-21 |
 | M3 | First real port | DoomFire-Raylib on web and desktop; porting guide validated | Not started |
 | M4 | Template & packages | `dotnet new` template, packable framework, local feed | Not started |
 | M5 | CI & deploy | GitHub Actions, Pages deploy, Playwright smoke test, size report | Not started |
@@ -123,18 +123,42 @@ dependency rules and the one-context rule are written down in [ARCHITECTURE.md](
 **Goal:** the full pipeline with a real game on both hosts.
 **Exit criteria:** every acceptance criterion in [HELLO-WORLD.md](HELLO-WORLD.md) passes.
 
-- [ ] `RayforgeCanvas` component: `OnAfterRenderAsync` boot, loading/error overlays, error boundary, teardown
-- [ ] `rayforge.js`: canvas binding, rAF loop, resize, fullscreen, asset preload into MEMFS, visibility pause
-- [ ] `RayforgeBridge`: synchronous `[JSExport]` frame entry, crash capture, stop-on-error
-- [ ] `CanvasLayout`: pure Fit/Fill math, unit-tested (CSS size, mouse scale, letterbox offsets) *(math + tests landed in M1)*
-- [ ] `BrowserMouseCapture`: pointer lock, `movementX/Y` accumulation, scale applied
-- [ ] `BrowserRuntimeHost`: fullscreen, quit, `document.title`
-- [ ] `Rayforge.Desktop`: runner, cursor capture, resize polling, teardown *(runner + services landed in M1; audio to enable)*
-- [ ] Hello World game: cube, text, logo texture, font, beep, rings, diagnostics, resize, fullscreen
-- [ ] Generated assets: `logo.png`, `blip.ogg`, `ui.ttf` with license notes in `Assets/README.md`
-- [ ] Diagnostics overlay (F3/D) fed by host counters, never per-frame Blazor renders
-- [ ] Pointer-lock, fullscreen and audio verified in Chrome and Firefox
-- [ ] Record publish size, load time and memory in `HELLO-WORLD.md`
+- [x] `RayforgeCanvas` component: `OnAfterRenderAsync` boot, loading/error overlays, error boundary, teardown
+- [x] `rayforge.js`: canvas binding, rAF loop, resize, fullscreen, asset preload into MEMFS, visibility pause
+- [x] `RayforgeBridge`: synchronous `[JSExport]` frame entry, crash capture, stop-on-error
+- [x] `CanvasLayout`: pure Fit/Fill math, unit-tested (CSS size, mouse scale, letterbox offsets) *(math + tests landed in M1)*
+- [x] `BrowserMouseCapture`: pointer lock, `movementX/Y` accumulation, scale applied *(implemented; demo is a stretch goal)*
+- [x] `BrowserRuntimeHost`: fullscreen, quit, `document.title`
+- [x] `Rayforge.Desktop`: runner, cursor capture, resize polling, teardown *(audio enabled in M2)*
+- [x] Hello World game: cube, text, logo texture, font, beep, rings, diagnostics, resize, fullscreen
+- [x] Generated assets: `logo.png`, `blip.ogg`, `ui.ttf` with license notes in `Assets/README.md`
+- [x] Diagnostics overlay (F3/D) fed by host counters, never per-frame Blazor renders
+- [ ] Pointer-lock, fullscreen and audio verified in Chrome and Firefox **(blocked: only Chromium installed; fullscreen and audio verified there)**
+- [x] Record publish size, load time and memory in `HELLO-WORLD.md`
+
+**Notes:** the browser runtime is `src/Rayforge.Web/wwwroot/rayforge.js`; C# owns layout, JS owns the loop and
+the DOM. `Assets.props` now wipes `wwwroot/assets` on every build so removed assets cannot linger in a publish.
+`<base href="./" />` is required for sub-path hosting.
+
+**Result:** Hello World runs identically on both hosts. Headless Chromium (DevServer and a Release static
+publish, at `/` and under `/hello-world/`) checked: three assets in MEMFS, click-to-play, 60 fps loop, Space
+pause/resume, D diagnostics, F fullscreen, letterboxing at 900x900 (900x506.25 at y=196.875), mouse marker
+within ~1 px at DPR 1 and 2, blocked-module error, deliberate crash (X) with teardown + Reload, audio unlocked
+by the click. Desktop loaded all assets, `Rayforge Sans` and audio, and followed compositor resizes
+(957x1162 and 1920x1200).
+
+Release publish: 6.63 MB raw / 2.05 MB brotli, ~1.0 s to the start button, 9.2 MB JS heap + 38.4 MiB wasm heap.
+Details in [HELLO-WORLD.md](HELLO-WORLD.md) section 7.
+
+**Traps found (now handled):** an RCL needs `_Imports.razor` with `@using Microsoft.AspNetCore.Components.Web`
+or `@onclick` compiles to literal markup; `InitWindow` overwrites the canvas CSS size, so the letterbox must be
+re-applied before the first frame; calling a `[JSImport]` before its module is imported aborts the .NET runtime;
+a keydown+keyup inside one frame is invisible to `IsKeyPressed`; the desktop host must run from its app directory
+for relative assets to resolve.
+
+**Open:** Firefox/Safari (not installed); pointer lock is implemented but not shown in the demo; AOT off (M5).
+
+**Closed:** 2026-10-21.
 
 ---
 

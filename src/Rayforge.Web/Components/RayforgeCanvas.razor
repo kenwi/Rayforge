@@ -6,31 +6,46 @@
             width="@Options.Width"
             height="@Options.Height"></canvas>
 
-    @if (_state == BootState.Loading)
+    @if (_state != BootState.Running)
     {
-        <div class="rayforge-overlay" role="status" aria-live="polite">
-            <div class="rayforge-panel">
+        <div class="rayforge-overlay"
+             role="@(_state == BootState.Failed ? "alert" : "status")"
+             aria-live="polite">
+            <div class="rayforge-panel @(_state == BootState.Failed ? "rayforge-panel-error" : "")">
                 <h1 class="rayforge-title">@Options.Title</h1>
-                <p class="rayforge-status"><span class="rayforge-dot"></span>Loading Rayforge…</p>
+
+                @switch (_state)
+                {
+                    case BootState.Loading:
+                        <p class="rayforge-status">
+                            <span class="rayforge-dot"></span>@_status
+                        </p>
+                        break;
+
+                    case BootState.ReadyToStart:
+                        <p class="rayforge-status">@_status</p>
+                        <button type="button" class="rayforge-button" @onclick="StartAsync">Click to play</button>
+                        <p class="rayforge-hint">Audio starts on the first click.</p>
+                        break;
+
+                    case BootState.Starting:
+                        <p class="rayforge-status">
+                            <span class="rayforge-dot"></span>Starting…
+                        </p>
+                        break;
+
+                    case BootState.Stopped:
+                        <p class="rayforge-status">@_status</p>
+                        <button type="button" class="rayforge-button" @onclick="Reload">Reload</button>
+                        break;
+
+                    case BootState.Failed:
+                        <p class="rayforge-status">Rayforge could not start.</p>
+                        <pre class="rayforge-error">@_error</pre>
+                        <button type="button" class="rayforge-button" @onclick="Reload">Reload</button>
+                        break;
+                }
             </div>
-        </div>
-    }
-    else if (_state == BootState.Failed)
-    {
-        <div class="rayforge-overlay" role="alert">
-            <div class="rayforge-panel rayforge-panel-error">
-                <h1 class="rayforge-title">@Options.Title</h1>
-                <p class="rayforge-status">Rayforge could not start.</p>
-                <pre class="rayforge-error">@_error</pre>
-            </div>
-        </div>
-    }
-    else
-    {
-        <div class="rayforge-badge">
-            <span class="rayforge-badge-mode">skeleton</span>
-            <span>@_assets.Count assets</span>
-            <span>@_layout.CssWidth.ToString("0")×@_layout.CssHeight.ToString("0")</span>
         </div>
     }
 </div>

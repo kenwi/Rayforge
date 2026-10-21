@@ -27,6 +27,10 @@ public static class DesktopRunner
 
         IGameLog log = ConsoleGameLog.Instance;
 
+        // Games load assets with relative paths ("assets/..."). Run from the app directory so the copy next
+        // to the executable wins over whatever directory the shell/IDE used to launch us.
+        Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+
         Raylib.SetConfigFlags(options.ConfigFlags);
         Raylib.InitWindow(options.Width, options.Height, options.Title);
 

@@ -13,6 +13,7 @@
     display: block;
     background: #000;
     box-shadow: 0 0 0 1px #2b2b3c, 0 24px 80px rgb(0 0 0 / 65%);
+    outline: none;
 }
 
 .rayforge-overlay {
@@ -21,16 +22,17 @@
     display: grid;
     place-items: center;
     padding: 24px;
-    pointer-events: none;
+    background: rgb(6 6 10 / 35%);
+    backdrop-filter: blur(2px);
 }
 
 .rayforge-panel {
-    min-width: min(420px, 100%);
+    min-width: min(380px, 100%);
     max-width: min(720px, 100%);
     padding: 28px 32px;
     border: 1px solid #303044;
     border-radius: 14px;
-    background: rgb(16 16 24 / 88%);
+    background: rgb(16 16 24 / 92%);
     box-shadow: 0 18px 60px rgb(0 0 0 / 55%);
     text-align: left;
 }
@@ -40,7 +42,7 @@
 }
 
 .rayforge-title {
-    margin: 0 0 10px;
+    margin: 0 0 12px;
     font-size: 20px;
     font-weight: 600;
     letter-spacing: 0.01em;
@@ -53,6 +55,39 @@
     margin: 0;
     color: #a7a7bd;
     font-size: 14px;
+}
+
+.rayforge-hint {
+    margin: 10px 0 0;
+    color: #6f6f86;
+    font-size: 12px;
+}
+
+.rayforge-button {
+    margin-top: 18px;
+    padding: 10px 20px;
+    border: 1px solid #4a5bd0;
+    border-radius: 10px;
+    background: #3d4cb8;
+    color: #f4f5ff;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 120ms ease, transform 120ms ease;
+}
+
+.rayforge-button:hover {
+    background: #4a5bd0;
+}
+
+.rayforge-button:active {
+    transform: translateY(1px);
+}
+
+.rayforge-button:focus-visible {
+    outline: 2px solid #9fb0ff;
+    outline-offset: 2px;
 }
 
 .rayforge-dot {
@@ -73,27 +108,6 @@
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
-}
-
-.rayforge-badge {
-    position: absolute;
-    left: 14px;
-    bottom: 12px;
-    display: flex;
-    gap: 10px;
-    padding: 6px 10px;
-    border: 1px solid #262636;
-    border-radius: 999px;
-    background: rgb(10 10 16 / 72%);
-    color: #8b8ba4;
-    font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, monospace;
-    font-size: 11px;
-    letter-spacing: 0.04em;
-}
-
-.rayforge-badge-mode {
-    color: #9fb0ff;
-    text-transform: uppercase;
 }
 
 @keyframes rayforge-pulse {

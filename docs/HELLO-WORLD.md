@@ -4,8 +4,10 @@ The first demo for Rayforge. Its job is not to be pretty; it is to prove that a 
 a Blazor web host and a native desktop host all behave the same, and that the browser-specific pieces
 (resize, mouse mapping, audio unlock, assets, errors) work.
 
-Status: **specification**, implemented in M2. M0 already validated the pieces this demo depends on
-([spike 0001](spikes/0001-raylib-cs-blazor-wasm.md)).
+Status: **implemented in M2** (2026-10-21). Verified in Chromium against the DevServer and a Release static
+publish, at the root and under a sub-path; the desktop host was verified on a native window. Firefox/Safari
+remain unverified (not installed). Measurements and the exact checks are in section 7. M0 validated the pieces
+this demo depends on ([spike 0001](spikes/0001-raylib-cs-blazor-wasm.md)).
 
 ---
 
@@ -72,6 +74,7 @@ Logical resolution: **1280 x 720**, `CanvasScaleMode.Fit`, dark background, lett
 | Mouse move | Draw a small circle at `GetMousePosition()`; must stay under the cursor |
 | `Escape` | No default action; the demo ignores it (`SetExitKey(KeyboardKey.Null)`). Close the window/tab to exit |
 | `D` (debug) | Toggle the diagnostics line (FPS, frame time, backing/CSS size, scale, asset mode) |
+| `X` (debug) | Deliberately throws in `Update`: the host stops the loop, unloads the game and shows the error overlay |
 
 The mouse marker is the resize test: if it drifts from the cursor at any window size or zoom level, the
 `SetMouseScale` math is wrong.
@@ -114,8 +117,9 @@ The mouse marker is the resize test: if it drifts from the cursor at any window 
 ### Teardown
 
 - Closing the tab: browser cleans up.
-- A "Quit" path is not required in the demo, but `Dispose` must unload the texture, font and sound and close
-  the audio device/window. The base calls it exactly once.
+- A "Quit" path is not required in the demo. `HelloWorldGame.Dispose` unloads its texture, font and sound; the
+  **host** owns the lifecycle and closes the audio device and the window exactly once (`Shutdown` in
+  `RayforgeCanvas`, `finally` in `DesktopRunner`).
 
 ---
 
@@ -229,3 +233,46 @@ Do not let these delay M2.
   `Context.IsBrowser` check or a base service, not a compile-time symbol, so the same assembly can be tested
   on desktop.
 - The demo font should have a clear license (SIL OFL) and be credited in `Assets/README.md`.
+
+---
+
+## 7. Verification and measurements (M2)
+
+**Environment:** headless Chromium (`/usr/bin/chromium`, `--enable-unsafe-swiftshader`), 1280x720 and 900x900
+viewports, DPR 1 and 2, localhost. The Release publish (`dotnet publish -c Release -o artifacts/hello-world`)
+was served by a plain static server both at `/` and under `/hello-world/`.
+
+Checks run by the Puppeteer harness:
+
+- Boot: `document.title`, the manifest, three assets preloaded into MEMFS, the click-to-play gate, and no
+  console errors or failed requests.
+- After clicking: overlay gone, rAF loop running, cube animating, canvas focused.
+- Input: `Space` freezes the scene (pixel-identical frames while paused) and resumes it; `D` toggles the
+  diagnostics; `F` enters and exits DOM fullscreen.
+- Fidelity: 900x900 lettersboxes to 900x506.25 at y=196.875; `InitWindow` no longer clobbers the letterbox;
+  the mouse marker lands within ~1 px of the cursor at DPR 1 and DPR 2, measured by pixel analysis.
+- Error paths: blocking `rayforge.js` shows the module error; pressing `X` throws inside `Update`, stops the
+  loop, applies teardown and shows the crash overlay with Reload.
+- Audio: `InitAudioDevice` succeeds after the click gesture (`audio=True` in the game log).
+- Desktop: native window loads all three assets, uses `Rayforge Sans`, initializes audio, and adapts when the
+  compositor resizes the window (Hyprland resized it to 957x1162 and 1920x1200; diagnostics and layout
+  followed).
+
+| Metric | Value | Notes |
+|---|---|---|
+| `dotnet publish -c Release` | 14 s cold / 7 s warm | 0 warnings; log says `Linking with emcc with -O0` |
+| `wwwroot` raw | 6.63 MB (159 files) | includes the published `.br`/`.gz` siblings |
+| First-load transfer | 6.65 MB / 55 requests | uncompressed Python server, includes wasm and assets |
+| Brotli estimate | 2.05 MB | per-file `.br` where published, else raw |
+| Gzip estimate | 2.52 MB | same method |
+| Boot to "Click to play" | ~1.0 s | localhost, headless Chromium |
+| Loop rate | 60.3 fps | rAF count over 2 s at 1280x720 |
+| Memory after 3 s | 9.2 MB JS heap, 38.4 MiB wasm heap | `performance.memory`, `Module.HEAPU8.length` |
+| Demo assets | 15,334 B | logo 411, `ui.ttf` 11,140, `blip.ogg` 3,783 |
+
+M1 baseline, same method: 6.04 MB raw / 1.85 MB brotli. M2 adds the rAF loop, the JS runtime and ~15 KB of demo
+assets; the rest of the difference is publish/framework file variance.
+
+**Open:** Firefox and Safari are not installed, so criterion 1 is Chromium-only for now. Pointer lock is
+implemented (`BrowserMouseCapture`) but not demonstrated. AOT is not enabled. The desktop host was verified on
+one machine (Hyprland/Wayland).

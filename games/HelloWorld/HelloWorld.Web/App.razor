@@ -1,3 +1,17 @@
 @using Rayforge.Web.Components
+@using Microsoft.AspNetCore.Components.Web
 
-<RayforgeCanvas />
+<ErrorBoundary>
+    <ChildContent>
+        <RayforgeCanvas />
+    </ChildContent>
+    <ErrorContent Context="exception">
+        <div class="fatal">
+            <div class="fatal-panel">
+                <h1>Rayforge hit an unrecoverable error</h1>
+                <pre>@exception</pre>
+                <a href="">Reload</a>
+            </div>
+        </div>
+    </ErrorContent>
+</ErrorBoundary>

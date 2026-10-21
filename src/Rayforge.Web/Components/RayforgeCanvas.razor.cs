@@ -2,21 +2,23 @@ using System.Runtime.InteropServices.JavaScript;
 using System.Runtime.Versioning;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
+using Rayforge.Web.Interop;
+using Raylib_cs;
 
 namespace Rayforge.Web.Components;
 
 /// <summary>
-/// The single host component for a Rayforge game: owns the canvas, the boot sequence and the
-/// loading/error overlays.
+/// The single host component for a Rayforge game: owns the canvas, the boot sequence, the frame loop and
+/// the loading/error overlays.
 /// </summary>
 /// <remarks>
 /// <para>Rule: one instance per page. raylib cannot re-initialize in the same document, and a Blazor
 /// router would dispose and recreate this component. There is deliberately no router.</para>
-/// <para>M1 boots to a measured, letterboxed canvas and a loading/error overlay. The frame loop,
-/// pointer lock and MEMFS asset preload arrive in M2.</para>
+/// <para>The frame loop lives in JS (requestAnimationFrame) and enters C# through
+/// <see cref="RayforgeBridge.UpdateFrame"/>, which calls <see cref="Tick"/> synchronously.</para>
 /// </remarks>
 [SupportedOSPlatform("browser")]
-public partial class RayforgeCanvas : ComponentBase, IAsyncDisposable
+public partial class RayforgeCanvas : ComponentBase, IAsyncDisposable, IBrowserShell
 {
     /// <summary>Path of the JS module, resolved against <see cref="NavigationManager.BaseUri"/>.</summary>
     private const string ModulePath = "_content/Rayforge.Web/rayforge.js";
@@ -27,13 +29,30 @@ public partial class RayforgeCanvas : ComponentBase, IAsyncDisposable
     private static int s_liveCanvases;
 
     private readonly string _canvasId = $"rayforge-canvas-{Guid.NewGuid():N}";
+    private readonly BrowserMouseCapture _mouseCapture = new();
+    private readonly GameDiagnostics _diagnostics = new();
 
     private BootState _state = BootState.Loading;
+    private string _status = "Loading Rayforge…";
     private string _error = "";
     private IReadOnlyList<string> _assets = [];
     private CanvasLayout _layout;
-    private bool _initialized;
+    private double _hostWidth;
+    private double _hostHeight;
+
+    private bool _booted;
     private bool _counted;
+    private bool _moduleImported;
+    private bool _windowReady;
+    private bool _gameInitialized;
+    private bool _audioReady;
+    private bool _startedRendering;
+    private bool _crashed;
+    private bool _shutdown;
+    private bool _isFullscreen;
+
+    private double _sampleSeconds;
+    private long _sampleFrames;
 
     [Inject]
     private GameOptions Options { get; set; } = default!;
@@ -47,15 +66,20 @@ public partial class RayforgeCanvas : ComponentBase, IAsyncDisposable
     [Inject]
     private IGameLog Log { get; set; } = default!;
 
+    [Inject]
+    private IGame Game { get; set; } = default!;
+
     private string CanvasId => _canvasId;
 
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        if (!firstRender || _booted)
         {
             return;
         }
+
+        _booted = true;
 
         if (Interlocked.Increment(ref s_liveCanvases) > 1)
         {
@@ -74,31 +98,332 @@ public partial class RayforgeCanvas : ComponentBase, IAsyncDisposable
             // Relative module URLs resolve against _framework/, so absolutise against the app base.
             string moduleUrl = new Uri(new Uri(Navigation.BaseUri), ModulePath).AbsoluteUri;
             await JSHost.ImportAsync(RayforgeInterop.ModuleName, moduleUrl);
+            _moduleImported = true;
 
-            using (JSObject metrics = RayforgeInterop.Init(CanvasId))
+            string mode = Options.ScaleMode == CanvasScaleMode.Fit ? "fit" : "fill";
+            using (JSObject metrics = RayforgeInterop.Init(CanvasId, mode, Options.Title))
             {
-                double viewportWidth = metrics.GetPropertyAsDouble("cssWidth");
-                double viewportHeight = metrics.GetPropertyAsDouble("cssHeight");
-
-                _layout = CanvasLayout.Fit(Options.Width, Options.Height, viewportWidth, viewportHeight);
+                ApplyHostSize(metrics.GetPropertyAsDouble("cssWidth"), metrics.GetPropertyAsDouble("cssHeight"));
             }
 
-            RayforgeInterop.SetCanvasCssSize(CanvasId, _layout.CssWidth, _layout.CssHeight);
-            _initialized = true;
+            _status = "Loading assets…";
+            StateHasChanged();
 
             _assets = await ReadAssetManifestAsync();
+            double bytes = await RayforgeInterop.Preload(_assets.ToArray());
+            Log.Info($"assets ready: {_assets.Count} file(s), {bytes:0} bytes");
+            _diagnostics.AssetMode = Options.AssetMode;
 
-            _state = BootState.Ready;
-            Log.Info(
-                $"skeleton ready: {_assets.Count} asset(s), canvas {_layout.CssWidth:0.#}x{_layout.CssHeight:0.#} css, " +
-                $"mouse scale {_layout.MouseScaleX:0.###}");
+            if (Options.RequireUserGesture)
+            {
+                _status = $"{_assets.Count} assets ready · {Options.Width}×{Options.Height}";
+                _state = BootState.ReadyToStart;
+                StateHasChanged();
+                return;
+            }
+
+            await StartAsync();
         }
         catch (Exception ex)
         {
             Fail(ex);
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Creates the window (and audio device) and starts the loop. Called from the "Click to play" button
+    /// or directly when <see cref="GameOptions.RequireUserGesture"/> is false.
+    /// </summary>
+    /// <remarks>
+    /// Everything before the first <c>await</c> runs inside the click gesture, which is what the browser
+    /// autoplay policy requires for <c>InitAudioDevice</c>.
+    /// </remarks>
+    private async Task StartAsync()
+    {
+        if (_state is BootState.Running or BootState.Starting or BootState.Failed or BootState.Stopped)
+        {
+            return;
         }
 
+        _state = BootState.Starting;
         StateHasChanged();
+
+        try
+        {
+            Raylib.SetTraceLogLevel(TraceLogLevel.Warning);
+            Raylib.InitWindow(Options.Width, Options.Height, Options.Title);
+            _windowReady = Raylib.IsWindowReady();
+            if (!_windowReady)
+            {
+                throw new InvalidOperationException(
+                    "raylib could not initialize the canvas (InitWindow failed). " +
+                    "The canvas must be visible and non-zero-sized.");
+            }
+
+            // Escape belongs to the game.
+            Raylib.SetExitKey(KeyboardKey.Null);
+
+            // InitWindow assigns the canvas its own CSS size (the logical size). Re-apply the letterbox
+            // before the first frame, otherwise the canvas is stretched at any other aspect ratio.
+            ApplyHostSize(_hostWidth, _hostHeight);
+
+            if (Options.EnableAudio)
+            {
+                Raylib.InitAudioDevice();
+                _audioReady = Raylib.IsAudioDeviceReady();
+                if (!_audioReady)
+                {
+                    Log.Warn("audio device unavailable; continuing without sound");
+                }
+            }
+
+            _diagnostics.BackingWidth = Options.Width;
+            _diagnostics.BackingHeight = Options.Height;
+
+            Game.Initialize(CreateGameContext());
+            _gameInitialized = true;
+
+            // The first rAF may fire before this await returns, so the loop must already be allowed to run.
+            _state = BootState.Running;
+            _diagnostics.Status = "running";
+
+            await RayforgeInterop.Start(
+                this,
+                typeof(RayforgeBridge).Assembly.GetName().Name!,
+                Options.TargetFps);
+
+            _startedRendering = true;
+
+            Log.Info($"running \"{Options.Title}\" ({Options.Width}x{Options.Height}, {Options.ScaleMode}, " +
+                     $"audio={_audioReady})");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Fail(ex);
+            StateHasChanged();
+        }
+    }
+
+    private GameContext CreateGameContext() => new()
+    {
+        Width = Options.Width,
+        Height = Options.Height,
+        IsBrowser = true,
+        AudioAvailable = _audioReady,
+        Runtime = new BrowserRuntimeHost(this),
+        MouseCapture = _mouseCapture,
+        Log = Log,
+        Diagnostics = _diagnostics,
+    };
+
+    /// <summary>One frame from the JS rAF loop. Never throws across the JS boundary.</summary>
+    internal bool Tick(float deltaTime)
+    {
+        if (_state != BootState.Running || !_gameInitialized || _crashed)
+        {
+            return false;
+        }
+
+        try
+        {
+            Game.Update(deltaTime);
+
+            // Update may call Runtime.RequestQuit(), which tears the game and window down immediately.
+            if (_state != BootState.Running || _shutdown)
+            {
+                return false;
+            }
+
+            Game.Draw();
+
+            _sampleSeconds += deltaTime;
+            _sampleFrames++;
+            if (_sampleSeconds >= 1.0)
+            {
+                _diagnostics.Fps = _sampleFrames / _sampleSeconds;
+                _diagnostics.FrameTimeMilliseconds = deltaTime * 1000.0;
+                _sampleSeconds = 0;
+                _sampleFrames = 0;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            HandleCrash("The game loop threw.", ex);
+            return false;
+        }
+    }
+
+    /// <summary>Layout update from the ResizeObserver / fullscreen change.</summary>
+    internal void ApplyHostSize(double hostWidth, double hostHeight)
+    {
+        if (_shutdown || hostWidth <= 0 || hostHeight <= 0)
+        {
+            return;
+        }
+
+        _hostWidth = hostWidth;
+        _hostHeight = hostHeight;
+
+        if (Options.ScaleMode == CanvasScaleMode.Fit)
+        {
+            _layout = CanvasLayout.Fit(Options.Width, Options.Height, hostWidth, hostHeight);
+            RayforgeInterop.SetCanvasCssSize(_layout.CssWidth, _layout.CssHeight);
+
+            _diagnostics.BackingWidth = Options.Width;
+            _diagnostics.BackingHeight = Options.Height;
+            ApplyMouseScale();
+        }
+        else
+        {
+            _layout = CanvasLayout.Fill(hostWidth, hostHeight);
+
+            int backingWidth = Math.Max(1, (int)Math.Round(_layout.CssWidth));
+            int backingHeight = Math.Max(1, (int)Math.Round(_layout.CssHeight));
+
+            if (_windowReady)
+            {
+                Raylib.SetWindowSize(backingWidth, backingHeight);
+                if (_gameInitialized)
+                {
+                    Game.OnResize(backingWidth, backingHeight);
+                }
+
+                Raylib.SetMouseScale(1f, 1f);
+            }
+
+            // SetWindowSize can touch the canvas too, so apply the sizes last.
+            RayforgeInterop.SetBackingSize(backingWidth, backingHeight);
+            RayforgeInterop.SetCanvasCssSize(backingWidth, backingHeight);
+
+            _diagnostics.BackingWidth = backingWidth;
+            _diagnostics.BackingHeight = backingHeight;
+        }
+
+        _diagnostics.CssWidth = (int)Math.Round(_layout.CssWidth);
+        _diagnostics.CssHeight = (int)Math.Round(_layout.CssHeight);
+        _diagnostics.MouseScaleX = (float)_layout.MouseScaleX;
+        _diagnostics.MouseScaleY = (float)_layout.MouseScaleY;
+    }
+
+    private void ApplyMouseScale()
+    {
+        if (!_windowReady || _hostWidth <= 0 || _hostHeight <= 0)
+        {
+            return;
+        }
+
+        Raylib.SetMouseScale((float)_layout.MouseScaleX, (float)_layout.MouseScaleY);
+    }
+
+    /// <summary>DOM fullscreen changed. Called from JS.</summary>
+    internal void SetFullscreen(bool isFullscreen) => _isFullscreen = isFullscreen;
+
+    /// <summary>Pointer lock state changed. Called from JS.</summary>
+    internal void SetPointerCaptured(bool captured) => _mouseCapture.SetCaptured(captured);
+
+    /// <summary>WebGL context lost or a fatal JS-side frame failure. Called from JS.</summary>
+    internal void HandleContextLost(string message) => HandleCrash(message);
+
+    private void HandleCrash(string message, Exception? exception = null)
+    {
+        if (_crashed)
+        {
+            return;
+        }
+
+        _crashed = true;
+        _state = BootState.Failed;
+        _error = exception is null
+            ? message
+            : $"{message}{Environment.NewLine}{exception.GetType().Name}: {exception.Message}";
+
+        Log.Error(message, exception);
+        TryStopLoop();
+        Shutdown();
+
+        // Called from the JS frame: schedule the overlay on the renderer.
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void Fail(Exception exception)
+    {
+        _error = $"{exception.GetType().Name}: {exception.Message}";
+        Log.Error("Rayforge failed to start", exception);
+        TryStopLoop();
+        Shutdown();
+        _state = BootState.Failed;
+    }
+
+    private void TryStopLoop()
+    {
+        // Calling a [JSImport] before the module is imported aborts the whole .NET runtime.
+        if (!_moduleImported)
+        {
+            return;
+        }
+
+        try
+        {
+            RayforgeInterop.Stop();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"stopping the loop failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>Disposes the game and closes the audio device and window. Runs at most once.</summary>
+    private void Shutdown()
+    {
+        if (_shutdown)
+        {
+            return;
+        }
+
+        _shutdown = true;
+
+        if (_gameInitialized)
+        {
+            _gameInitialized = false;
+            try
+            {
+                Game.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"game dispose failed: {ex.Message}");
+            }
+        }
+
+        if (_audioReady)
+        {
+            _audioReady = false;
+            try
+            {
+                Raylib.CloseAudioDevice();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"audio close failed: {ex.Message}");
+            }
+        }
+
+        if (_windowReady)
+        {
+            _windowReady = false;
+            try
+            {
+                Raylib.CloseWindow();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"window close failed: {ex.Message}");
+            }
+        }
     }
 
     private async Task<IReadOnlyList<string>> ReadAssetManifestAsync()
@@ -118,30 +443,81 @@ public partial class RayforgeCanvas : ComponentBase, IAsyncDisposable
             .ToArray();
     }
 
-    private void Fail(Exception exception)
+    private void Reload()
     {
-        _state = BootState.Failed;
-        _error = $"{exception.GetType().Name}: {exception.Message}";
-        Log.Error("Rayforge boot failed", exception);
+        if (!_moduleImported)
+        {
+            Navigation.Refresh();
+            return;
+        }
+
+        try
+        {
+            RayforgeInterop.Reload();
+        }
+        catch
+        {
+            Navigation.Refresh();
+        }
+    }
+
+    // --- IBrowserShell (IRuntimeHost implementation for the game) ---------------
+
+    bool IBrowserShell.IsFullscreen => _isFullscreen;
+
+    void IBrowserShell.RequestQuit()
+    {
+        if (_state != BootState.Running)
+        {
+            return;
+        }
+
+        _state = BootState.Stopped;
+        _status = "Rayforge stopped.";
+        TryStopLoop();
+        Shutdown();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    void IBrowserShell.ToggleFullscreen() => _ = ToggleFullscreenAsync();
+
+    private async Task ToggleFullscreenAsync()
+    {
+        try
+        {
+            _isFullscreen = await RayforgeInterop.ToggleFullscreen();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"fullscreen request failed: {ex.Message}");
+        }
     }
 
     /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
-        if (_initialized)
+        _state = BootState.Stopped;
+
+        if (_startedRendering)
+        {
+            _startedRendering = false;
+            TryStopLoop();
+        }
+
+        if (_moduleImported)
         {
             try
             {
-                RayforgeInterop.Dispose(CanvasId);
+                RayforgeInterop.Dispose();
             }
             catch (Exception ex)
             {
                 // The JS runtime may already be shutting down.
                 Log.Warn($"canvas release failed: {ex.Message}");
             }
-
-            _initialized = false;
         }
+
+        Shutdown();
 
         if (_counted)
         {
@@ -156,7 +532,10 @@ public partial class RayforgeCanvas : ComponentBase, IAsyncDisposable
     private enum BootState
     {
         Loading,
-        Ready,
+        ReadyToStart,
+        Starting,
+        Running,
+        Stopped,
         Failed,
     }
 }
