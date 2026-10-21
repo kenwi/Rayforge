@@ -1,0 +1,25 @@
+# Build output
+bin/
+obj/
+artifacts/
+publish/
+*.user
+*.suo
+.vs/
+.idea/
+
+# Test / tool output
+TestResults/
+playwright-report/
+test-results/
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local configuration
+*.local.json
+.env
+.env.*
+!.env.example
