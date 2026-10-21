@@ -27,3 +27,6 @@ Thumbs.db
 # Spike: assets synced into the host's wwwroot by the build (see the M0 spike).
 spike/**/wwwroot/assets/
 
+# Game hosts: assets are copied here by games/<Game>/Assets.props at build time.
+games/**/wwwroot/assets/
+

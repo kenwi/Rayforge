@@ -3,10 +3,10 @@
 A small framework for running C# / [Raylib](https://raylib.com) games in the browser with Blazor WebAssembly,
 while keeping the game code itself portable to desktop.
 
-> **Status: M0 + M0b done, M1 next.** The spike proved the stack end to end (3D + 2D + texture + audio +
-> letterboxed mouse mapping, on the DevServer and from a static publish), and the upgrade probe moved the
-> baseline to Raylib-cs 8.1.0 / raylib 6.0 with no vendored native binary. No framework code exists yet.
-> Roadmap and checklists: [docs/MILESTONES.md](docs/MILESTONES.md).
+> **Status: M1 done (skeleton).** One `net10.0` game library, a Blazor WASM host and a desktop host compile
+> against hard dependency rules (enforced by tests). The web host boots to a measured, letterboxed canvas with
+> loading/error overlays; the desktop host runs the placeholder game. M2 adds the frame loop and the Hello World
+> demo. Roadmap and checklists: [docs/MILESTONES.md](docs/MILESTONES.md).
 
 ## Why
 
@@ -39,11 +39,26 @@ game code (net10.0, Raylib-cs only)  ->  same game on desktop and in the browser
 |---|---|
 | [docs/PLAN.md](docs/PLAN.md) | Architecture, alternatives, build and packaging, risks, recorded decisions |
 | [docs/MILESTONES.md](docs/MILESTONES.md) | All milestones M0-M6 with checklists |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Project graph, dependency rules, one-context rule, boot sequences, asset pipeline |
 | [docs/UPGRADING-RAYLIB.md](docs/UPGRADING-RAYLIB.md) | How to upgrade Raylib-cs / native raylib without a spike |
 | [docs/spikes/](docs/spikes/) | Spike records (0001 stack proof, 0002 raylib 8.1.0 upgrade) |
 | [docs/HELLO-WORLD.md](docs/HELLO-WORLD.md) | The first demo: behavior and acceptance criteria |
 | [docs/PORTING-GUIDE.md](docs/PORTING-GUIDE.md) | Checklist for bringing an existing Raylib-cs game to the web |
-| [docs/spikes/](docs/spikes/) | Time-boxed experiments and their results |
+
+## Skeleton (M1)
+
+```bash
+dotnet workload install wasm-tools                       # once
+dotnet build Rayforge.slnx
+dotnet test Rayforge.slnx
+
+dotnet run --project games/HelloWorld/HelloWorld.Web     # canvas + loading/error overlay
+dotnet run --project games/HelloWorld/HelloWorld.Desktop # placeholder game window (needs a display)
+dotnet publish games/HelloWorld/HelloWorld.Web -c Release -o artifacts/hello-world
+```
+
+Serve `artifacts/hello-world/wwwroot` with any server that sends `application/wasm`. The `-O0` native-link
+workaround is built into the framework props, so the publish needs no extra flag.
 
 ## Spike (M0)
 

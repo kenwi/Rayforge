@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install wasm-tools
+        run: dotnet workload install wasm-tools
+
+      - name: Restore
+        run: dotnet restore Rayforge.slnx
+
+      - name: Build
+        run: dotnet build Rayforge.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test Rayforge.slnx -c Release --no-build
+
+      # Publish, not just build: the native link (raylib.a + the wasm flags from
+      # Rayforge.Web/buildTransitive) only runs here. M1 keeps it in CI so an ABI or flag
+      # regression fails before a release.
+      - name: Publish Hello World web host
+        run: dotnet publish games/HelloWorld/HelloWorld.Web/HelloWorld.Web.csproj -c Release -o artifacts/hello-world
+
+      - name: Verify web artifact
+        run: |
+          set -euo pipefail
+          test -s artifacts/hello-world/wwwroot/assets/logo.png
+          test -s artifacts/hello-world/wwwroot/assets/blip.wav
+          test -f artifacts/hello-world/wwwroot/assets/rayforge.assets.json
+          grep -q 'assets/logo.png' artifacts/hello-world/wwwroot/assets/rayforge.assets.json
+          ls artifacts/hello-world/wwwroot/_framework/dotnet.native.*.wasm
+          echo "web artifact OK"

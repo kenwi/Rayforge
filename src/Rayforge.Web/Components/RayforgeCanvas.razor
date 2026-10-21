@@ -1,0 +1,36 @@
+@namespace Rayforge.Web.Components
+
+<div class="rayforge-host">
+    <canvas id="@CanvasId"
+            class="rayforge-canvas"
+            width="@Options.Width"
+            height="@Options.Height"></canvas>
+
+    @if (_state == BootState.Loading)
+    {
+        <div class="rayforge-overlay" role="status" aria-live="polite">
+            <div class="rayforge-panel">
+                <h1 class="rayforge-title">@Options.Title</h1>
+                <p class="rayforge-status"><span class="rayforge-dot"></span>Loading Rayforge…</p>
+            </div>
+        </div>
+    }
+    else if (_state == BootState.Failed)
+    {
+        <div class="rayforge-overlay" role="alert">
+            <div class="rayforge-panel rayforge-panel-error">
+                <h1 class="rayforge-title">@Options.Title</h1>
+                <p class="rayforge-status">Rayforge could not start.</p>
+                <pre class="rayforge-error">@_error</pre>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="rayforge-badge">
+            <span class="rayforge-badge-mode">skeleton</span>
+            <span>@_assets.Count assets</span>
+            <span>@_layout.CssWidth.ToString("0")×@_layout.CssHeight.ToString("0")</span>
+        </div>
+    }
+</div>

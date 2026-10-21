@@ -1,0 +1,47 @@
+:root {
+    color-scheme: dark;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #0a0a10;
+    color: #e9e9f2;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.boot-splash {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #8b8ba4;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    inset: auto 0 0 0;
+    padding: 12px 18px;
+    background: #2a1420;
+    color: #ffb3bf;
+    font-size: 13px;
+    text-align: center;
+    z-index: 1000;
+}
+
+#blazor-error-ui .reload,
+#blazor-error-ui .dismiss {
+    color: #ffd7dd;
+    margin-left: 12px;
+    cursor: pointer;
+}
+
+#blazor-error-ui .dismiss {
+    float: right;
+}

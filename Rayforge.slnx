@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Rayforge.Core/Rayforge.Core.csproj" />
+    <Project Path="src/Rayforge.Desktop/Rayforge.Desktop.csproj" />
+    <Project Path="src/Rayforge.Web/Rayforge.Web.csproj" />
+  </Folder>
+
+  <Folder Name="/games/HelloWorld/">
+    <Project Path="games/HelloWorld/HelloWorld.Desktop/HelloWorld.Desktop.csproj" />
+    <Project Path="games/HelloWorld/HelloWorld.Game/HelloWorld.Game.csproj" />
+    <Project Path="games/HelloWorld/HelloWorld.Web/HelloWorld.Web.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/">
+    <Project Path="tests/Rayforge.Tests/Rayforge.Tests.csproj" />
+  </Folder>
+</Solution>

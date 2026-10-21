@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <RootNamespace>HelloWorld.Web</RootNamespace>
+    <RayforgeHost>Web</RayforgeHost>
+
+    <!-- Explicit RID: Directory.Build.targets applies the Rayforge wasm flags when this is set. -->
+    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <WasmGenerateAppBundle>true</WasmGenerateAppBundle>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Rayforge.Web\Rayforge.Web.csproj" />
+    <ProjectReference Include="..\HelloWorld.Game\HelloWorld.Game.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\Assets.props" />
+
+</Project>

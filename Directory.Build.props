@@ -1,0 +1,17 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+
+    <!-- Central package management: versions live in Directory.Packages.props. -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+
+    <RayforgeRepoRoot>$(MSBuildThisFileDirectory)</RayforgeRepoRoot>
+    <RayforgeVersion>0.1.0-preview.1</RayforgeVersion>
+  </PropertyGroup>
+
+</Project>

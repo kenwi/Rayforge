@@ -1,0 +1,15 @@
+<Project>
+
+  <!-- Everything raylib-related (the native archive, -sUSE_GLFW=3) comes from the Raylib-cs package's
+       own buildTransitive targets. This file only sets what the *host* needs. See spike 0002. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
+    <WasmBuildNative>true</WasmBuildNative>
+    <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- Temporary: -O2 makes the native link run wasm-opt with a flag Binaryen 117 does not know
+         (spike 0001, 4.3; unchanged on 8.1.0, spike 0002, 4.4). Owned by M5. -->
+    <EmccLinkOptimizationFlag Condition="'$(EmccLinkOptimizationFlag)' == ''">-O0</EmccLinkOptimizationFlag>
+  </PropertyGroup>
+
+</Project>

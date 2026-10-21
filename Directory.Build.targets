@@ -1,0 +1,9 @@
+<Project>
+
+  <!-- In-repo convenience: a project built for browser-wasm gets the same flags the NuGet package
+       ships through buildTransitive (M4). One file, two entry points - never duplicate the flags.
+       Directory.Build.targets sees RuntimeIdentifier, Directory.Build.props would not. -->
+  <Import Project="$(RayforgeRepoRoot)src/Rayforge.Web/buildTransitive/Rayforge.Web.props"
+          Condition="'$(RuntimeIdentifier)' == 'browser-wasm' And Exists('$(RayforgeRepoRoot)src/Rayforge.Web/buildTransitive/Rayforge.Web.props')" />
+
+</Project>

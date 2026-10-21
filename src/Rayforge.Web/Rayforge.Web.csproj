@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>Rayforge.Web</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <!-- Required by [JSImport] (SYSLIB1074). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Description>Blazor WebAssembly host for Rayforge games.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="Raylib-cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rayforge.Core\Rayforge.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Shipped to consumers as buildTransitive (M4). In this repo Directory.Build.targets imports the
+       same file for any project built with RuntimeIdentifier=browser-wasm. -->
+  <ItemGroup>
+    <None Include="buildTransitive\**\*" Pack="true" PackagePath="buildTransitive\" />
+  </ItemGroup>
+
+</Project>

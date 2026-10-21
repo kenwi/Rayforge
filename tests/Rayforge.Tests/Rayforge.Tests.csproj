@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Rayforge.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Rayforge.Core\Rayforge.Core.csproj" />
+    <ProjectReference Include="..\..\src\Rayforge.Web\Rayforge.Web.csproj" />
+    <ProjectReference Include="..\..\src\Rayforge.Desktop\Rayforge.Desktop.csproj" />
+    <ProjectReference Include="..\..\games\HelloWorld\HelloWorld.Game\HelloWorld.Game.csproj" />
+  </ItemGroup>
+
+</Project>

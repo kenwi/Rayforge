@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Rayforge</RootNamespace>
+    <AssemblyName>Rayforge.Core</AssemblyName>
+    <IsPackable>true</IsPackable>
+    <Description>Platform-neutral contracts for Rayforge games (no Blazor, no JavaScript interop).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Raylib-cs" />
+  </ItemGroup>
+
+</Project>

@@ -11,15 +11,15 @@ Legend: `[x]` done, `[ ]` planned, **(blocked)** needs something external.
 |---|---|---|---|
 | M0 | Spike | Prove Raylib-cs 7.0.2 + `raylib.a` in a fresh Blazor app | **Done** - 2026-10-21 |
 | M0b | Upgrade probe | Raylib-cs 8.1.0 / raylib 6.0 from the package; drop the vendored `raylib.a` | **Done** - 2026-10-21 |
-| M1 | Skeleton | Solution, framework projects, contracts, asset plumbing, CI build | Not started |
+| M1 | Skeleton | Solution, framework projects, contracts, asset plumbing, CI build | **Done** - 2026-10-21 |
 | M2 | Hello World | Base canvas + JS bridge + desktop runner + demo game on both hosts | Not started |
 | M3 | First real port | DoomFire-Raylib on web and desktop; porting guide validated | Not started |
 | M4 | Template & packages | `dotnet new` template, packable framework, local feed | Not started |
 | M5 | CI & deploy | GitHub Actions, Pages deploy, Playwright smoke test, size report | Not started |
 | M6 | Wolfrender port | Separate track: port Wolfrender onto the base | Not started |
 
-M0 was the decision gate and is closed; M0b settled the raylib baseline and removed the former M7. M1 is the
-next action.
+M0 was the decision gate and is closed; M0b settled the raylib baseline and removed the former M7. M1 built the
+skeleton; M2 is the next action.
 
 ---
 
@@ -81,27 +81,40 @@ the old baseline into the skeleton.
 **Exit criteria:** `dotnet build` is green, dependency rules are documented and enforced by a test, the web host
 boots to a Razor loading screen and fails gracefully.
 
-- [ ] Create `Rayforge.slnx`, `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`
-- [ ] `src/Rayforge.Core`: `IGame`, `GameBase`, `GameContext`, `GameOptions`, `CanvasScaleMode`, `AssetMode`,
+- [x] Create `Rayforge.slnx`, `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`
+- [x] `src/Rayforge.Core`: `IGame`, `GameBase`, `GameContext`, `GameOptions`, `CanvasScaleMode`, `AssetMode`,
       `IMouseCapture`, `IRuntimeHost`, `IGameLog`, `GameDiagnostics` - no Blazor, no JavaScript interop
-- [ ] `src/Rayforge.Web`: Razor Class Library skeleton, `wwwroot/rayforge.js`, scoped CSS, DI entry point
-- [ ] `src/Rayforge.Desktop`: `DesktopRunner` + desktop services
-- [ ] `games/HelloWorld/HelloWorld.Game`: empty `IGame` implementation that compiles against `Rayforge.Core`
-- [ ] `games/HelloWorld/HelloWorld.Web` + `HelloWorld.Desktop`: hosts that boot and show "loading"/"no game" states
-- [ ] Asset plumbing: `Assets.props` + the `wwwroot/assets` sync target from spike 0001, plus a build-generated
+- [x] `src/Rayforge.Web`: Razor Class Library skeleton, `wwwroot/rayforge.js`, scoped CSS, DI entry point
+- [x] `src/Rayforge.Desktop`: `DesktopRunner` + desktop services
+- [x] `games/HelloWorld/HelloWorld.Game`: empty `IGame` implementation that compiles against `Rayforge.Core`
+- [x] `games/HelloWorld/HelloWorld.Web` + `HelloWorld.Desktop`: hosts that boot and show "loading"/"no game" states
+- [x] Asset plumbing: `Assets.props` + the `wwwroot/assets` sync target from spike 0001, plus a build-generated
       asset list for the web host (no hand-maintained array)
-- [ ] Framework `buildTransitive/Rayforge.Web.props` with `WasmBuildNative`, `EmccLinkOptimizationFlag=-O0`
+- [x] Framework `buildTransitive/Rayforge.Web.props` with `WasmBuildNative`, `EmccLinkOptimizationFlag=-O0`
       (documented as temporary) and `InvariantGlobalization` - **no** raylib link flags, no
       `NativeFileReference`, no `WasmAllowUndefinedSymbols` (the package supplies the native archive; see
       spike 0002)
-- [ ] Architecture test: `.Game` references no Blazor/JS assembly; `Core` references no web assembly
-- [ ] `tests/Rayforge.Tests` project with the first unit tests for `CanvasLayout`
-- [ ] `.github/workflows/ci.yml`: restore, build, test (no deploy yet)
-- [ ] Document the dependency rules and the "one raylib context per page" rule
+- [x] Architecture test: `.Game` references no Blazor/JS assembly; `Core` references no web assembly
+- [x] `tests/Rayforge.Tests` project with the first unit tests for `CanvasLayout`
+- [x] `.github/workflows/ci.yml`: restore, build, test (no deploy yet)
+- [x] Document the dependency rules and the "one raylib context per page" rule
 
 **Notes:** `wwwroot/assets/` is generated output and stays gitignored. There is no `raylib.a` in the repo:
 `Raylib-cs 8.1.0` brings the native archive for every RID. Do not set `RuntimeIdentifier=browser-wasm` on
 `Rayforge.Core` or the game library, or the package's native reference may be requested outside the web host.
+
+**Result:** solution builds with 0 warnings; 25 unit tests pass (CanvasLayout, dependency rules, GameBase
+lifecycle, option defaults). The web host boots in a headless Chromium check against both the DevServer and a
+Release static publish: 1280x720 viewport -> 1280x720 CSS, 900x900 -> 900x506.25 at y=196.875, 2 assets listed,
+no console errors; blocking `rayforge.js` produces the error overlay instead of a black page. The desktop host
+opened a 1280x720 window, initialized the placeholder game with `browser=False`, and ran the loop without errors.
+Release publish logs `Linking with emcc with -O0` and ships real asset bytes plus `rayforge.assets.json`. The
+dependency rules and the one-context rule are written down in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+**Open:** the CI workflow has not executed yet (no push since it was added). Firefox/Safari remain unverified
+(only Chromium installed). M1 deliberately has no web frame loop, no MEMFS preload and no post-boot resize.
+
+**Closed:** 2026-10-21.
 
 ---
 
@@ -113,10 +126,10 @@ boots to a Razor loading screen and fails gracefully.
 - [ ] `RayforgeCanvas` component: `OnAfterRenderAsync` boot, loading/error overlays, error boundary, teardown
 - [ ] `rayforge.js`: canvas binding, rAF loop, resize, fullscreen, asset preload into MEMFS, visibility pause
 - [ ] `RayforgeBridge`: synchronous `[JSExport]` frame entry, crash capture, stop-on-error
-- [ ] `CanvasLayout`: pure Fit/Fill math, unit-tested (CSS size, mouse scale, letterbox offsets)
+- [ ] `CanvasLayout`: pure Fit/Fill math, unit-tested (CSS size, mouse scale, letterbox offsets) *(math + tests landed in M1)*
 - [ ] `BrowserMouseCapture`: pointer lock, `movementX/Y` accumulation, scale applied
 - [ ] `BrowserRuntimeHost`: fullscreen, quit, `document.title`
-- [ ] `Rayforge.Desktop`: runner, cursor capture, resize polling, teardown
+- [ ] `Rayforge.Desktop`: runner, cursor capture, resize polling, teardown *(runner + services landed in M1; audio to enable)*
 - [ ] Hello World game: cube, text, logo texture, font, beep, rings, diagnostics, resize, fullscreen
 - [ ] Generated assets: `logo.png`, `blip.ogg`, `ui.ttf` with license notes in `Assets/README.md`
 - [ ] Diagnostics overlay (F3/D) fed by host counters, never per-frame Blazor renders

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Rayforge.Desktop</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <Description>Desktop host for Rayforge games (raylib window, cursor capture, frame loop).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Raylib-cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rayforge.Core\Rayforge.Core.csproj" />
+  </ItemGroup>
+
+</Project>
