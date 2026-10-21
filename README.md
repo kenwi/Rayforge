@@ -3,8 +3,9 @@
 A small framework for running C# / [Raylib](https://raylib.com) games in the browser with Blazor WebAssembly,
 while keeping the game code itself portable to desktop.
 
-> **Status: M0 done, M1 next.** The technical spike proved the stack end to end (3D + 2D + texture + audio +
-> letterboxed mouse mapping, on the DevServer and from a static publish). No framework code exists yet.
+> **Status: M0 + M0b done, M1 next.** The spike proved the stack end to end (3D + 2D + texture + audio +
+> letterboxed mouse mapping, on the DevServer and from a static publish), and the upgrade probe moved the
+> baseline to Raylib-cs 8.1.0 / raylib 6.0 with no vendored native binary. No framework code exists yet.
 > Roadmap and checklists: [docs/MILESTONES.md](docs/MILESTONES.md).
 
 ## Why
