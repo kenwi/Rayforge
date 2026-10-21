@@ -1,0 +1,14 @@
+@namespace M0
+
+<div class="stage">
+    <canvas id="@CanvasId" width="1280" height="720"></canvas>
+</div>
+
+@if (_error is not null)
+{
+    <div class="overlay">
+        <h1>M0 failed</h1>
+        <pre>@_error</pre>
+        <button @onclick="Reload">Reload</button>
+    </div>
+}

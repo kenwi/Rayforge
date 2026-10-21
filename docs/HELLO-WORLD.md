@@ -1,10 +1,11 @@
 # Hello World - specification
 
-The first demo for Rayharbor. Its job is not to be pretty; it is to prove that a portable game assembly,
+The first demo for Rayforge. Its job is not to be pretty; it is to prove that a portable game assembly,
 a Blazor web host and a native desktop host all behave the same, and that the browser-specific pieces
 (resize, mouse mapping, audio unlock, assets, errors) work.
 
-Status: **specification only**, to be implemented in M2 after the M0 spike succeeds.
+Status: **specification**, implemented in M2. M0 already validated the pieces this demo depends on
+([spike 0001](spikes/0001-raylib-cs-blazor-wasm.md)).
 
 ---
 
@@ -12,14 +13,14 @@ Status: **specification only**, to be implemented in M2 after the M0 spike succe
 
 | Concern | How the demo exercises it |
 |---|---|
-| Static native linking | raylib 6.0 via Raylib-cs 8.1.0 `browser-wasm`, no custom `raylib.a` |
+| Static native linking | raylib 5.6-dev via a vendored `raylib.a` and Raylib-cs 7.0.2 (the decided baseline; 8.1.0 is M7) |
 | Game/host boundary | `HelloWorldGame` is a `net10.0` class library with zero Blazor/WASM references |
 | Desktop parity | The identical game class runs in `HelloWorld.Desktop` |
 | Frame loop | rAF-driven `Update(dt)` + `Draw()`; no blocking loop |
 | Delta time | Rotating cube speed is frame-rate independent |
 | 3D rendering | Rotating cube with `Camera3D`, depth test, colored faces |
 | 2D rendering | Text, FPS, resolution, border, mouse marker |
-| Texture loading | `assets/logo.png` |
+| Texture loading | `assets/logo.png` (fetched into MEMFS at boot) |
 | Font loading | `assets/ui.ttf` (custom font, falls back to default if missing) |
 | Audio + autoplay policy | Click-to-start overlay, beep on click (`assets/blip.ogg`) |
 | Input | Space toggles rotation, R resets, F fullscreen, mouse marker |
@@ -30,13 +31,13 @@ Not demonstrated (deliberately): pointer lock, menus, scenes, levels, save data,
 
 ---
 
-## 2. Visual and behaviour
+## 2. Visual and behavior
 
 Logical resolution: **1280 x 720**, `CanvasScaleMode.Fit`, dark background, letterboxed.
 
 ```
 +------------------------------------------------------------------+
-|  Hello, Rayharbor!                            FPS 60  1280x720   |
+|  Hello, Rayforge!                            FPS 60  1280x720   |
 |                                                                  |
 |                         +--------+                               |
 |                        /        /|                               |
@@ -69,7 +70,7 @@ Logical resolution: **1280 x 720**, `CanvasScaleMode.Fit`, dark background, lett
 | `F` | Toggle DOM fullscreen (browser) / window fullscreen (desktop) |
 | Left click | Play a short beep; spawn a ring at the mouse position that fades over ~0.6 s |
 | Mouse move | Draw a small circle at `GetMousePosition()`; must stay under the cursor |
-| `Escape` | Desktop: exit? No - `SetExitKey(Null)`; show a "press Alt+F4/close" hint or ignore. Browser: no effect |
+| `Escape` | No default action; the demo ignores it (`SetExitKey(KeyboardKey.Null)`). Close the window/tab to exit |
 | `D` (debug) | Toggle the diagnostics line (FPS, frame time, backing/CSS size, scale, asset mode) |
 
 The mouse marker is the resize test: if it drifts from the cursor at any window size or zoom level, the
@@ -125,14 +126,14 @@ games/HelloWorld/
 ├── Assets/
 │   ├── logo.png            # 64x64, generated placeholder
 │   ├── blip.ogg            # short beep
-│   └── ui.ttf              # small open-licence font (or reuse raylib default)
+│   └── ui.ttf              # small open-license font (or reuse raylib default)
 ├── Assets.props
 ├── HelloWorld.Game/
 │   ├── HelloWorldGame.cs   # ~150-200 lines, all game logic
 │   └── HelloWorld.Game.csproj
 ├── HelloWorld.Web/
-│   ├── App.razor           # <RayharborCanvas />
-│   ├── Program.cs          # AddRayharbor<HelloWorldGame>(...)
+│   ├── App.razor           # <RayforgeCanvas />
+│   ├── Program.cs          # AddRayforge<HelloWorldGame>(...)
 │   ├── _Imports.razor
 │   ├── wwwroot/index.html
 │   ├── wwwroot/css/app.css
@@ -142,7 +143,7 @@ games/HelloWorld/
     └── HelloWorld.Desktop.csproj
 ```
 
-The game project references `Rayharbor.Core` and `Raylib-cs` only. It must not know that a canvas, Blazor or
+The game project references `Rayforge.Core` and `Raylib-cs` only. It must not know that a canvas, Blazor or
 WASM exist.
 
 ---
@@ -172,15 +173,15 @@ A build is accepted when **all** of these pass:
 ### Desktop
 
 10. `dotnet run --project games/HelloWorld/HelloWorld.Desktop` opens a 1280x720 resizable window with the
-    same visuals and behaviour, at the same logical speed.
+    same visuals and behavior, at the same logical speed.
 11. Resizing the desktop window updates the layout, and the mouse marker remains correct.
 12. Closing the window exits cleanly; no unload/audio errors.
 
 ### Architecture
 
-13. `HelloWorld.Game.dll` references neither `Rayharbor.Web`, `Rayharbor.Desktop`, `Microsoft.AspNetCore.*`
+13. `HelloWorld.Game.dll` references neither `Rayforge.Web`, `Rayforge.Desktop`, `Microsoft.AspNetCore.*`
     nor `System.Runtime.InteropServices.JavaScript` (automated test).
-14. `Rayharbor.Core.dll` references no Blazor/JS interop assemblies (automated test).
+14. `Rayforge.Core.dll` references no Blazor/JS interop assemblies (automated test).
 15. The web host contains no game rules or raylib drawing calls (only configuration/DI).
 16. The base contains no `HelloWorld` names, assets or key bindings.
 
@@ -211,6 +212,8 @@ Do not let these delay M2.
 
 ## 6. Implementation notes / traps
 
+- Keep the canvas mounted and non-zero-sized behind the overlay. `InitWindow` against a `display:none` or
+  0x0 canvas produces a broken GL context and a black screen.
 - Call `InitAudioDevice` from the click handler **before any `await`**. If asset fetching happens after the
   click, the gesture is lost and audio may be suspended.
 - `BeginDrawing`/`EndDrawing` belong to the game, not the base. Ported games already do this; keep it.
@@ -225,4 +228,4 @@ Do not let these delay M2.
 - Keep the game class free of `#if BROWSER`. If a platform branch is truly needed, put it behind a
   `Context.IsBrowser` check or a base service, not a compile-time symbol, so the same assembly can be tested
   on desktop.
-- The demo font should have a clear licence (SIL OFL) and be credited in `Assets/README.md`.
+- The demo font should have a clear license (SIL OFL) and be credited in `Assets/README.md`.

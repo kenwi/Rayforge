@@ -1,17 +1,18 @@
-# Rayharbor
+# Rayforge
 
-**Working name.** A small framework for running C# / [Raylib](https://raylib.com) games in the browser with
-Blazor WebAssembly, while keeping the game code itself portable to desktop.
+A small framework for running C# / [Raylib](https://raylib.com) games in the browser with Blazor WebAssembly,
+while keeping the game code itself portable to desktop.
 
-> **Status: planning only.** No implementation exists yet. The architecture, alternatives and open questions
-> are in [docs/PLAN.md](docs/PLAN.md). The first implementation step is a technical spike (M0) to validate the
-> current Raylib-cs browser-wasm support inside a Blazor app.
+> **Status: M0 done, M1 next.** The technical spike proved the stack end to end (3D + 2D + texture + audio +
+> letterboxed mouse mapping, on the DevServer and from a static publish). No framework code exists yet.
+> Roadmap and checklists: [docs/MILESTONES.md](docs/MILESTONES.md).
 
 ## Why
 
 `Wolfrender.Blazor.Raylib` proved that a Blazor canvas + a statically linked `raylib.a` can drive a complete
 game in the browser. It also mixed the browser bridge, the host and one specific game into a single project.
-Rayharbor is a clean-room extraction of the *idea*: a reusable base, a game library, and thin hosts.
+Rayforge is a clean-room extraction of the *idea*: a reusable base, a game library, and thin hosts. No
+Wolfrender source code is copied.
 
 The intended end state:
 
@@ -19,34 +20,51 @@ The intended end state:
 game code (net10.0, Raylib-cs only)  ->  same game on desktop and in the browser
 ```
 
+## Decisions
+
+| | |
+|---|---|
+| Runtime | .NET 10, Blazor WebAssembly (standalone) |
+| Renderer | raylib 5.6-dev via a vendored `raylib.a`, bound with Raylib-cs 7.0.2 (8.1.0 upgrade is M7) |
+| Loop | `requestAnimationFrame` -> one synchronous `[JSExport]` per frame |
+| Canvas | Fit (fixed logical resolution + `SetMouseScale`) and Fill, both supported |
+| Assets | Fetched into the Emscripten MEMFS at boot (Blazor does not support `WasmFilesToIncludeInFileSystem`) |
+| Shape | `src/Rayforge.{Core,Web,Desktop}` + `games/<Game>/{.Game,.Web,.Desktop}` |
+| License | MIT |
+
 ## Documents
 
 | Document | Contents |
 |---|---|
-| [docs/PLAN.md](docs/PLAN.md) | Full plan: findings, naming, project-structure alternatives, architecture, build, roadmap, risks, decisions needed |
-| [docs/HELLO-WORLD.md](docs/HELLO-WORLD.md) | The first demo: exact behaviour and acceptance criteria |
-| [docs/PORTING-GUIDE.md](docs/PORTING-GUIDE.md) | Draft checklist for bringing an existing Raylib-cs game to the web |
+| [docs/PLAN.md](docs/PLAN.md) | Architecture, alternatives, build and packaging, risks, recorded decisions |
+| [docs/MILESTONES.md](docs/MILESTONES.md) | All milestones M0-M7 with checklists |
+| [docs/HELLO-WORLD.md](docs/HELLO-WORLD.md) | The first demo: behavior and acceptance criteria |
+| [docs/PORTING-GUIDE.md](docs/PORTING-GUIDE.md) | Checklist for bringing an existing Raylib-cs game to the web |
+| [docs/spikes/](docs/spikes/) | Time-boxed experiments and their results |
 
-## Proposed shape (not created yet)
+## Spike (M0)
 
+The proof of concept lives in [`spike/m0-raylib-blazor/`](spike/m0-raylib-blazor) and is throwaway code, kept
+as evidence. See [spike 0001](docs/spikes/0001-raylib-cs-blazor-wasm.md) for findings, measurements and the
+four plan corrections it produced.
+
+```bash
+dotnet workload install wasm-tools                                          # once
+dotnet run --project spike/m0-raylib-blazor                                 # dev server
+dotnet publish spike/m0-raylib-blazor -c Release -p:EmccLinkOptimizationFlag=-O0 -o artifacts/m0
 ```
-src/Rayharbor.Core/          portable contracts (IGame, GameContext) - no Blazor
-src/Rayharbor.Web/           Blazor canvas component, JS bridge, browser services
-src/Rayharbor.Desktop/       optional desktop runner
-games/HelloWorld/            .Game + .Web + .Desktop
-```
+
+Serve `artifacts/m0/wwwroot` with any server that sends `application/wasm`.
 
 ## Acknowledgements
 
-Rayharbor stands on the shoulders of:
+Rayforge stands on the shoulders of:
 
-- [Raylib](https://raylib.com) (zlib licence)
+- [Raylib](https://raylib.com) (zlib license)
 - [Raylib-cs](https://github.com/raylib-cs/raylib-cs) (MIT), including its official browser-wasm support
 - [Blazor.Raylib](https://github.com/trucidare/Blazor.Raylib) (MIT) and [DotnetRaylibWasm](https://github.com/stanoddly/DotnetRaylibWasm)
-- [Wolfrender.Blazor.Raylib](https://github.com/) for proving the approach
+- `Wolfrender.Blazor.Raylib` (local sibling project) for proving the approach
 
-No Wolfrender source code is copied into this project.
+## License
 
-## Licence
-
-Not chosen yet. MIT is the working assumption; see the open questions in the plan.
+MIT - see [LICENSE](LICENSE).

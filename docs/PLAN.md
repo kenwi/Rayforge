@@ -1,30 +1,36 @@
-# Rayharbor - Architecture & Implementation Plan
+# Rayforge - Architecture & Implementation Plan
 
-> Status: **draft for review**. Nothing is implemented.
+> Status: **decisions taken, M0 spike complete.** Implementation starts at M1.
 > Date: 2026-10-21
-> Repository: `~/Work/Rayharbor` (working name, no remote yet)
+> Repository: `~/Work/Rayforge` -> `kenwi/Rayforge` (public, MIT)
+> Milestone tracker: [MILESTONES.md](MILESTONES.md)
 
 ---
 
-## 0. TL;DR - decisions at a glance
+## 0. Decisions at a glance
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 |---|---|---|
-| 1 | Name | **Rayharbor** (working name). Alternatives in section 3. |
-| 2 | Structure | **Layered monorepo**: `src/` framework + `games/<Game>/` with `.Game`, `.Web`, `.Desktop`. |
-| 3 | Base + game separation | The game is a **plain `net10.0` class library**; the Blazor app is a **thin host**. Do not copy the base into each game. |
-| 4 | Raylib baseline | **Raylib-cs 8.1.0** (raylib 6.0). It now ships official `browser-wasm` support and `raylib.a`; no vendored native library is needed. |
-| 5 | Who owns the window/loop | The **host** owns `InitWindow` / `InitAudioDevice` / the frame loop. The game implements `IGame` (`Initialize`, `Update`, `Draw`, `Dispose`). |
-| 6 | Frame loop | `requestAnimationFrame` in JS calls **one synchronous `[JSExport]`** per frame. No blocking `while` loop, no per-frame `async Task`, no per-frame JS interop. |
-| 7 | Canvas sizing | Default **Fit** (fixed logical resolution, CSS letterboxing, `SetMouseScale`). Optional **Fill** (backing store = CSS pixels, responsive). HiDPI is a later mode. |
-| 8 | Assets | Default **Bundled** (`WasmFilesToIncludeInFileSystem`). Add **Preload** (manifest + fetch + progress) before porting a large game. |
-| 9 | Desktop parity | **In scope from day one**, via a thin `Rayharbor.Desktop` runner. It is the cheapest proof that the game code is portable. |
+| 1 | Name | **Rayforge**. Alternatives kept in section 3. |
+| 2 | Repository shape | **Alternative A - layered monorepo**: `src/` framework + `games/<Game>/` with `.Game`, `.Web`, `.Desktop`. |
+| 3 | Base + game separation | The game is a **plain `net10.0` class library**; the Blazor app is a **thin host**. The base is never copied into a game. |
+| 4 | Raylib baseline | **Raylib-cs 7.0.2 + vendored `raylib.a` (raylib 5.6-dev)** - the Wolfrender-proven combination. The official 8.1.0 `browser-wasm` package is evaluated later, in M7. |
+| 5 | Who owns the window/loop | The **host** owns `InitWindow` / `InitAudioDevice` / the frame loop. The game implements `IGame` (`Initialize`, `Update`, `Draw`, `OnResize`, `Dispose`). |
+| 6 | Frame loop | `requestAnimationFrame` in JS calls **one synchronous `[JSExport]`** per frame. No blocking `while` loop, no per-frame `async Task`, no per-frame C#->JS calls. |
+| 7 | Canvas sizing | **Both modes**: **Fit** (fixed logical resolution, CSS letterboxing, `SetMouseScale`) and **Fill** (backing store = CSS pixels, responsive). Fit is the default. HiDPI is a later mode. |
+| 8 | Assets | **Bundled** - every asset is fetched at boot and written into MEMFS before the first frame. Preload groups (manifest + progress) are added when a port needs them. |
+| 9 | Desktop parity | **In scope from day one**, via a thin `Rayforge.Desktop` runner. It is the cheapest proof that the game code is portable. |
 | 10 | Hello World | Rotating 3D cube + 2D text + texture + click sound + mouse marker + resize + fullscreen. Same game on web and desktop. |
-| 11 | Out of scope | Engine/ECS, editor, ImGui, level format, server, networking, hot reload, mobile controls. |
+| 11 | AOT | **Not in v1.** Measured in M5, enabled later only if it pays off. |
+| 12 | License | **MIT** ([LICENSE](../LICENSE)). |
+| 13 | First real port | **DoomFire-Raylib** (`~/Work/DoomFire-Raylib`), M3. |
+| 14 | Wolfrender | Ported last, M6, on a separate track. |
+| 15 | Out of scope | Engine/ECS, editor, ImGui, level format, server, networking, hot reload, mobile controls, multiple games per page. |
 
-**Highest-risk item:** Raylib-cs 8.1.0's browser-wasm support is new and its official example is *not* Blazor.
-Milestone **M0** is a one-day spike that must prove it works in a Blazor app before anything else is built.
-Fallback: the Wolfrender-proven Raylib-cs 7.0.2 + custom `raylib.a` setup.
+**M0 completed 2026-10-21: GO.** The stack renders in a fresh Blazor app (3D + 2D + texture + audio + letterboxed
+mouse mapping, on the DevServer and from a static publish). Evidence, measurements and the four plan corrections:
+[spikes/0001-raylib-cs-blazor-wasm.md](spikes/0001-raylib-cs-blazor-wasm.md).
+
 
 ---
 
@@ -81,8 +87,23 @@ source-level fork, not a real library boundary.
 | Static pointer-lock state | Only one game/canvas per page is possible; state leaks across reloads. |
 | `canvas.width = clientWidth` while passing `dpr` | HiDPI is ignored; blurry rendering and mismatched mouse coordinates. |
 
-**Conclusion:** keep the technique, drop the coupling. Rayharbor is a rewrite of the bridge around an explicit
+**Conclusion:** keep the technique, drop the coupling. Rayforge is a rewrite of the bridge around an explicit
 game contract, not a refactor of Wolfrender.
+
+### 1.4 Why not fork the existing base projects?
+
+- **`trucidare/Blazor.Raylib`** is a nine-file demo, not a framework: it has no game contract, hardcodes the
+  canvas ID and JS path, and does not ship a `raylib.a`; the consumer must import `Raylib.props` and supply
+  the native library. It was a useful starting point for Wolfrender, but extending it means carrying the same
+  limitations.
+- **`DotnetRaylibWasm`** is an archived .NET 7 prototype for raylib 4.x. It is a great reference for the
+  Emscripten/MSBuild tricks, not a maintained base.
+- **`Raylib-cs` 8.1.0** ships official `browser-wasm` support (`raylib.a` + `buildTransitive` targets), which
+  removes the main reason to carry a custom props file. It is the natural upgrade target (M7), but the review
+  chose the already-proven 7.0.2 + vendored `raylib.a` pair for v1.
+
+The official Raylib-cs web example is still the reference for the native/JS loop; Rayforge adds the Blazor
+host, game contract, desktop parity, overlays and packaging around the same technique.
 
 ---
 
@@ -128,39 +149,38 @@ uses `dotnet.js` + a hand-written `main.js`). It buys:
 - a clean place to host per-game services (asset loader, pointer lock, fullscreen).
 
 The game loop must **not** depend on Blazor rendering. Blazor updates only at boot, on errors and on
-user-driven overlay changes. If the UI framework ever becomes a problem, `Rayharbor.Core` + the JS bridge
+user-driven overlay changes. If the UI framework ever becomes a problem, `Rayforge.Core` + the JS bridge
 can be reused from a plain WASM host.
 
 ---
 
 ## 3. Name
 
-### 3.1 Recommendation: **Rayharbor**
+### 3.1 Chosen: **Rayforge**
 
-- "Ray" ties it to raylib; "harbor" is where things are brought in / docked - a port for games.
-- Reads well as a namespace and package prefix: `Rayharbor.Core`, `Rayharbor.Web`, `Rayharbor.Desktop`.
-- No GitHub repositories named `rayharbor` at the time of writing (GitHub search: 0 hits). NuGet/domain
-  availability must still be checked before publishing.
-- Tagline: *"Dock your Raylib game in the browser."*
+- "Ray" ties it to raylib; a forge is where a game is re-worked for another platform. It also matches the
+  spirit of the project (re-forging an existing game for the browser).
+- Reads well as a namespace and package prefix: `Rayforge.Core`, `Rayforge.Web`, `Rayforge.Desktop`.
+- Repository: `kenwi/Rayforge` (public). NuGet IDs are placeholders until M4; check availability before packing.
+- Tagline: *"Forge your Raylib game for the browser."*
 
-### 3.2 Alternatives
+### 3.2 Alternatives considered
 
 | Name | Meaning / why | Risk / why not |
 |---|---|---|
-| **Rayharbor** | Raylib + harbor (port). Unique, brandable, works in code. | Slightly abstract; must check NuGet/trademark. |
+| **Rayforge** | **Chosen.** Raylib + forge: re-work a game for the web. | Implies an engine/editor; close to Wolfrender's branding. |
+| **Rayharbor** | Raylib + harbor (a port). | Slightly abstract; replaced by Rayforge. |
 | **Slipway** | A ramp for launching boats - launching games into the web. Short. | 136 GitHub repos; generic outside the metaphor. |
 | **Rayport** | Most literal: raylib + port. | `atarigo/rayport` already packages Python raylib games for the web; confusing collision. |
 | **Porthole** | A window into the game; friendly. | Sounds like a UI/widget library, not a runtime. |
-| **Rayforge** | Workshop where a game is re-forged for the web. | Implies an engine/editor; close to Wolfrender's branding. |
 | **Raylib.Web** | Maximum clarity and discoverability. | No brand; collides conceptually with `Blazor.Raylib`; "Blazor" is a Microsoft trademark best kept out of package IDs. |
 | **Dockyard** | Where ships are fitted out. | Generic; no raylib signal. |
 
 ### 3.3 Rename strategy
 
-Only documentation exists, so renaming costs nothing now. Later it is:
-`git mv` the root folder + solution + `src/Rayharbor.*` projects, then a global replace of `Rayharbor`.
-Package IDs are placeholders until M4, so no NuGet history is at stake.
-**Decide the name before M1**, because project names and namespaces are easiest to set once.
+The name is fixed before any project or namespace exists, so this is now a non-issue. Only documentation and the
+repository folder ever carried the old name. Package IDs stay placeholders until M4.
+
 
 ---
 
@@ -183,17 +203,17 @@ is the right instinct: separate the framework from the game. Two refinements:
    stop flowing. Use a project reference inside the monorepo and a NuGet package for external games.
 
 Also: name folders by **role**, not by technology. `Blazor-raylib-basecode` will be wrong the day the bridge
-is used from a non-Blazor host or raylib-cs changes; `Rayharbor.Web` will still be right.
+is used from a non-Blazor host or raylib-cs changes; `Rayforge.Web` will still be right.
 
 ### 4.2 Structure alternatives
 
 #### Alternative A - Layered monorepo (recommended)
 
 ```
-Rayharbor/
-├── src/Rayharbor.Core/          # portable contracts, no Blazor
-├── src/Rayharbor.Web/           # Blazor RCL: canvas, JS bridge, browser services
-├── src/Rayharbor.Desktop/       # optional desktop runner
+Rayforge/
+├── src/Rayforge.Core/          # portable contracts, no Blazor
+├── src/Rayforge.Web/           # Blazor RCL: canvas, JS bridge, browser services
+├── src/Rayforge.Desktop/       # optional desktop runner
 ├── games/HelloWorld/
 │   ├── HelloWorld.Game/         # the portable game
 │   ├── HelloWorld.Web/          # thin Blazor host
@@ -222,7 +242,7 @@ Rayharbor/
 #### Alternative B - Base + game app (the literal suggestion)
 
 ```
-Rayharbor/
+Rayforge/
 ├── framework/                   # RCL or copied base
 └── MyGame/                      # Blazor WASM app containing game code
 ```
@@ -248,7 +268,7 @@ Rayharbor/
 MyGame/
 ├── src/MyGame.Game/
 ├── src/MyGame.Web/
-├── Directory.Packages.props     # Rayharbor.Web 0.x
+├── Directory.Packages.props     # Rayforge.Web 0.x
 └── nuget.config                 # local feed during development
 ```
 
@@ -307,34 +327,40 @@ Launcher.Web/  ->  games/A, games/B, games/C
 
 **Best when:** a demo gallery, not a game release. Keep it as a possible `samples/` after v1.
 
-### 4.3 Recommendation
+### 4.3 Decision
 
-**Alternative A now, evolving into Alternative C at M4.**
+**Alternative A**, evolving into Alternative C at M4.
 
 - During development, `ProjectReference` gives a fast inner loop and lets us debug the bridge.
 - All three framework projects are `IsPackable=true` from day one; at M4 we pack them and the template
   consumes the package. No code moves.
-- Alternative B is acceptable only if the user wants the absolute minimum and never ports a second game.
+- Alternative B was rejected: it cannot express desktop parity without Wolfrender's `Compile Include` trick,
+  which is exactly the coupling this project exists to remove.
 - Avoid D entirely for this project; it is the Wolfrender trap.
 
-### 4.4 Proposed tree (to be created in M1)
+### 4.4 Tree (M1 creates everything below `spike/`)
 
 ```
-Rayharbor/
-├── Rayharbor.slnx
+Rayforge/
+├── Rayforge.slnx
 ├── Directory.Build.props
 ├── Directory.Packages.props
 ├── global.json
 ├── .editorconfig
 ├── .gitignore
+├── LICENSE                          # MIT
 ├── README.md
 ├── docs/
 │   ├── PLAN.md
+│   ├── MILESTONES.md
 │   ├── HELLO-WORLD.md
 │   ├── PORTING-GUIDE.md
-│   └── spikes/                     # M0 results go here
+│   └── spikes/
+│       ├── README.md
+│       └── 0001-raylib-cs-blazor-wasm.md    # M0 result
+├── spike/m0-raylib-blazor/          # throwaway M0 probe, kept as evidence
 ├── src/
-│   ├── Rayharbor.Core/
+│   ├── Rayforge.Core/
 │   │   ├── IGame.cs
 │   │   ├── GameBase.cs
 │   │   ├── GameContext.cs
@@ -343,25 +369,25 @@ Rayharbor/
 │   │   ├── IMouseCapture.cs
 │   │   ├── IRuntimeHost.cs
 │   │   ├── IGameLog.cs
-│   │   └── Rayharbor.Core.csproj            net10.0
-│   ├── Rayharbor.Desktop/
+│   │   └── Rayforge.Core.csproj            net10.0
+│   ├── Rayforge.Desktop/
 │   │   ├── DesktopRunner.cs
 │   │   ├── DesktopMouseCapture.cs
 │   │   ├── DesktopRuntimeHost.cs
-│   │   └── Rayharbor.Desktop.csproj         net10.0
-│   └── Rayharbor.Web/
+│   │   └── Rayforge.Desktop.csproj         net10.0
+│   └── Rayforge.Web/
 │       ├── Components/
-│       │   ├── RayharborCanvas.razor
-│       │   ├── RayharborCanvas.razor.cs
-│       │   └── RayharborCanvas.razor.css
-│       ├── Interop/RayharborBridge.cs
+│       │   ├── RayforgeCanvas.razor
+│       │   ├── RayforgeCanvas.razor.cs
+│       │   └── RayforgeCanvas.razor.css
+│       ├── Interop/RayforgeBridge.cs
 │       ├── BrowserMouseCapture.cs
 │       ├── BrowserRuntimeHost.cs
 │       ├── CanvasLayout.cs                  # pure, unit-testable
 │       ├── ServiceCollectionExtensions.cs
-│       ├── wwwroot/rayharbor.js
-│       ├── buildTransitive/Rayharbor.Web.props
-│       └── Rayharbor.Web.csproj             net10.0 RCL
+│       ├── wwwroot/rayforge.js
+│       ├── buildTransitive/Rayforge.Web.props
+│       └── Rayforge.Web.csproj             net10.0 RCL
 ├── games/
 │   └── HelloWorld/
 │       ├── Assets/
@@ -383,9 +409,9 @@ Rayharbor/
 │           ├── Program.cs
 │           └── HelloWorld.Desktop.csproj    net10.0 Exe
 ├── tests/
-│   ├── Rayharbor.Tests/                     # unit + architecture tests
+│   ├── Rayforge.Tests/                     # unit + architecture tests
 │   └── HelloWorld.BrowserTests/             # Playwright smoke (M5)
-├── templates/rayharbor-game/                # M4
+├── templates/rayforge-game/                # M4
 └── .github/workflows/
     ├── ci.yml
     └── deploy-hello-world.yml               # M5
@@ -394,56 +420,72 @@ Rayharbor/
 ### 4.5 Project responsibilities and dependency rules
 
 ```
-HelloWorld.Game  ->  Rayharbor.Core, Raylib-cs
-HelloWorld.Web   ->  HelloWorld.Game, Rayharbor.Web
-HelloWorld.Desktop -> HelloWorld.Game, Rayharbor.Desktop
+HelloWorld.Game  ->  Rayforge.Core, Raylib-cs
+HelloWorld.Web   ->  HelloWorld.Game, Rayforge.Web
+HelloWorld.Desktop -> HelloWorld.Game, Rayforge.Desktop
 
-Rayharbor.Web     ->  Rayharbor.Core, Raylib-cs, Microsoft.AspNetCore.Components.Web
-Rayharbor.Desktop ->  Rayharbor.Core, Raylib-cs
+Rayforge.Core     ->  Raylib-cs
+Rayforge.Web      ->  Rayforge.Core, Raylib-cs, Microsoft.AspNetCore.Components.Web
+Rayforge.Desktop  ->  Rayforge.Core, Raylib-cs
 ```
 
 Rules, enforced by a unit test inspecting referenced assemblies:
 
-- `Rayharbor.Core` must not reference Blazor, JavaScript interop or WASM-specific APIs.
-- `<Game>.Game` must not reference `Rayharbor.Web`, `Rayharbor.Desktop`, `Microsoft.AspNetCore.*` or
+- `Rayforge.Core` must not reference Blazor, JavaScript interop or WASM-specific APIs.
+- `<Game>.Game` must not reference `Rayforge.Web`, `Rayforge.Desktop`, `Microsoft.AspNetCore.*` or
   `System.Runtime.InteropServices.JavaScript`.
 - Hosts contain **no game rules**: config, asset wiring, DI, nothing else.
 - The base contains **no game knowledge**: no namespaces, asset names, scene types or key bindings from a
   specific game.
-- One raylib context per page. The base guards against a second `RayharborCanvas` starting.
+- One raylib context per page. The base guards against a second `RayforgeCanvas` starting.
 
 ### 4.6 Where assets live
 
 `games/<Name>/Assets/` is the single source of truth for both hosts. A tiny `Assets.props` imported by both
-host projects maps the same files into each output:
-
-**Desktop**
-
-```xml
-<ItemGroup>
-  <Content Include="$(GameAssetsDir)**\*"
-           Link="assets\%(RecursiveDir)%(Filename)%(Extension)"
-           CopyToOutputDirectory="PreserveNewest" />
-</ItemGroup>
-```
-
-**Web, Bundled mode (default)**
+host projects maps the same files into each output. Each host sets `RayforgeHost` (`Web` or `Desktop`) and the
+web host optionally sets `RayforgeAssetMode` (`Bundled` default, or `Preload`).
 
 ```xml
-<ItemGroup Condition="'$(RayharborAssetMode)' == 'Bundled'">
-  <WasmFilesToIncludeInFileSystem Include="$(GameAssetsDir)**\*"
-                                  TargetPath="assets\%(RecursiveDir)%(Filename)%(Extension)" />
-</ItemGroup>
+<Project>
+  <PropertyGroup>
+    <GameAssetsDir>$(MSBuildThisFileDirectory)Assets\</GameAssetsDir>
+    <RayforgeAssetMode Condition="'$(RayforgeAssetMode)' == ''">Bundled</RayforgeAssetMode>
+  </PropertyGroup>
+
+  <!-- Desktop: assets next to the executable, read by raylib's normal file IO. -->
+  <ItemGroup Condition="'$(RayforgeHost)' == 'Desktop'">
+    <Content Include="$(GameAssetsDir)**\*"
+             Link="assets\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Web (both asset modes): files must physically exist under wwwroot/assets before
+       the static web asset manifest is resolved. The copy target is in the framework
+       props; the generated folder is gitignored. -->
+  <ItemGroup Condition="'$(RayforgeHost)' == 'Web'">
+    <GameAsset Include="$(GameAssetsDir)**\*" />
+  </ItemGroup>
+
+  <Target Name="SyncGameAssetsIntoWwwroot"
+          BeforeTargets="ResolveStaticWebAssetsInputs"
+          Condition="'$(RayforgeHost)' == 'Web'">
+    <Copy SourceFiles="@(GameAsset)"
+          DestinationFiles="@(GameAsset->'$(MSBuildProjectDirectory)\wwwroot\assets\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Include="wwwroot\assets\**\*" Exclude="@(Content)" />
+    </ItemGroup>
+  </Target>
+</Project>
 ```
 
-**Web, Preload mode**
+The M0 spike proved the two modes differ only in the fetch list and the progress UI, not in how files reach
+MEMFS (see 5.7 and spike 0001, 4.1). `RayforgeAssetMode` therefore selects the list/manifest the host is given,
+not the transport.
 
-```xml
-<ItemGroup Condition="'$(RayharborAssetMode)' == 'Preload'">
-  <Content Include="$(GameAssetsDir)**\*"
-           Link="wwwroot\assets\%(RecursiveDir)%(Filename)%(Extension)" />
-</ItemGroup>
-```
+`RayforgeHost` is set in the host `.csproj` (`<RayforgeHost>Web</RayforgeHost>` /
+`<RayforgeHost>Desktop</RayforgeHost>`). Without it, the imported props cannot tell the hosts apart and
+assets get copied twice or into the wrong place.
 
 Use lowercase `assets/` in code on every platform. On Linux, path case matters. The game must only use
 relative paths (`assets/logo.png`), never a leading slash or an absolute path.
@@ -454,15 +496,17 @@ relative paths (`assets/logo.png`), never a leading slash or an absolute path.
 
 ```csharp
 using HelloWorld;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Rayharbor.Web;
+using Rayforge;
+using Rayforge.Web;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 
-builder.Services.AddRayharbor<HelloWorldGame>(options =>
+builder.Services.AddRayforge<HelloWorldGame>(options =>
 {
-    options.Title = "Hello, Rayharbor!";
+    options.Title = "Hello, Rayforge!";
     options.Width = 1280;
     options.Height = 720;
     options.ScaleMode = CanvasScaleMode.Fit;
@@ -476,7 +520,7 @@ await builder.Build().RunAsync();
 **`HelloWorld.Web/App.razor`** - no router, no layout:
 
 ```razor
-<RayharborCanvas />
+<RayforgeCanvas />
 ```
 
 No router is deliberate: navigation would dispose/recreate the canvas and raylib cannot re-initialize safely
@@ -486,11 +530,11 @@ in one page session. A game is a single full-screen surface, not a website.
 
 ```csharp
 using HelloWorld;
-using Rayharbor.Desktop;
+using Rayforge.Desktop;
 
 DesktopRunner.Run<HelloWorldGame>(new()
 {
-    Title = "Hello, Rayharbor!",
+    Title = "Hello, Rayforge!",
     Width = 1280,
     Height = 720,
     EnableAudio = true,
@@ -507,13 +551,14 @@ Keep it deliberately small. The game uses Raylib-cs directly for drawing, input 
 owns the pieces that differ between desktop and browser.
 
 ```csharp
-namespace Rayharbor;
+namespace Rayforge;
 
 public interface IGame : IDisposable
 {
     void Initialize(GameContext context);
     void Update(float deltaTime);
     void Draw();
+    void OnResize(int width, int height);
 }
 
 public abstract class GameBase : IGame
@@ -535,7 +580,9 @@ public abstract class GameBase : IGame
 }
 ```
 
-`GameContext` provides the platform-specific services, but never wraps raylib rendering:
+`GameContext` provides the platform-specific services, but never wraps raylib rendering. `Width`/`Height` are
+the logical size at initialization; in Fill mode read `GetScreenWidth/Height` (or `OnResize`) for live
+dimensions.
 
 ```csharp
 public sealed class GameContext
@@ -543,10 +590,31 @@ public sealed class GameContext
     public required int Width { get; init; }        // logical/backing size
     public required int Height { get; init; }
     public required bool IsBrowser { get; init; }
+    public required bool AudioAvailable { get; init; }
     public required IRuntimeHost Runtime { get; init; }        // quit, fullscreen
     public required IMouseCapture MouseCapture { get; init; }  // pointer lock / cursor
     public required IGameLog Log { get; init; }
     public required GameDiagnostics Diagnostics { get; init; }
+}
+
+public enum CanvasScaleMode { Fit, Fill }
+public enum AssetMode { Bundled, Preload }
+
+public sealed class GameOptions
+{
+    public string Title { get; set; } = "Rayforge Game";
+    public int Width { get; set; } = 1280;
+    public int Height { get; set; } = 720;
+    public CanvasScaleMode ScaleMode { get; set; } = CanvasScaleMode.Fit;
+    public AssetMode AssetMode { get; set; } = AssetMode.Bundled;
+    public bool EnableAudio { get; set; } = true;
+    public bool RequireUserGesture { get; set; } = true;
+    public int TargetFps { get; set; }             // 0 = rAF/vsync
+
+    // Applied before InitWindow on desktop. Browser support varies; do not rely on it for
+    // cursor/fullscreen behavior.
+    public ConfigFlags ConfigFlags { get; set; } =
+        ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint;
 }
 
 public interface IMouseCapture
@@ -559,7 +627,6 @@ public interface IMouseCapture
 
 public interface IRuntimeHost
 {
-    bool IsBrowser { get; }
     bool IsFullscreen { get; }
     void RequestQuit();
     void ToggleFullscreen();
@@ -578,20 +645,34 @@ public interface IRuntimeHost
 **Optional `GameDiagnostics`** (read-only): FPS, frame time, canvas/backing size, scale, asset mode. Updated
 once per second by the base; safe for a debug overlay. Never a per-frame Blazor render.
 
+**Responsibility split**
+
+| The base owns | The game owns |
+|---|---|
+| Canvas creation, module import, `InitWindow` / `CloseWindow` | Game loop body (`Update` / `Draw`) |
+| Frame scheduling, delta clamping, pause on hidden tab | Drawing (`BeginDrawing` / `EndDrawing`, camera, shaders) |
+| `InitAudioDevice` / `CloseAudioDevice` and the start gesture | Loading/playing sounds and music |
+| Canvas sizing, letterboxing, mouse scale/offset | Layout inside the logical resolution |
+| Pointer lock, cursor visibility, fullscreen | What mouse/key input means |
+| Asset bundling/preloading into the MEMFS | Which assets exist and when they are used |
+| Loading/error/crash overlays | Game UI/HUD and menus |
+| Diagnostics counters | Save data, settings, progression |
+| Teardown order and the "one raylib context" guard | Scene/level management |
+
 ### 5.2 Boot sequence
 
 ```
 Blazor starts
-  -> <RayharborCanvas> renders <canvas> + overlay ("Loading...")
+  -> <RayforgeCanvas> renders <canvas> + overlay ("Loading...")
   -> OnAfterRenderAsync(firstRender)
-  -> import ./_content/Rayharbor.Web/rayharbor.js
+  -> import an absolute URL for _content/Rayforge.Web/rayforge.js
   -> JS init(canvasId, handle, assemblyName):
        - bind runtime module canvas
        - set tabIndex, focus/contextmenu/keyboard listeners
        - ResizeObserver + visibilitychange + fullscreenchange
        - return DPR / CSS size
   -> assets:
-       Bundled: already in VFS (loaded by the WASM runtime)
+       Bundled: fetch the build-generated list -> write every file to MEMFS
        Preload: fetch manifest -> write files to MEMFS -> progress to overlay
   -> if RequireUserGesture: show "Click to play"; wait for click
   -> InitWindow(logicalW, logicalH, title)
@@ -629,7 +710,7 @@ function frame(now) {
         acc = 0;
     }
 
-    if (!exports.Rayharbor.Web.Interop.RayharborBridge.UpdateFrame(handle, dt)) {
+    if (!exports.Rayforge.Web.Interop.RayforgeBridge.UpdateFrame(handle, dt)) {
         running = false;
         cancelAnimationFrame(raf);
     }
@@ -642,7 +723,7 @@ C# side:
 [JSExport]
 private static bool UpdateFrame([JSMarshalAs<JSType.Any>] object handle, float deltaTime)
 {
-    if (handle is not RayharborCanvas canvas) return false;
+    if (handle is not RayforgeCanvas canvas) return false;
 
     try
     {
@@ -743,30 +824,46 @@ Integer scaling is an option (`floor(scale)`), useful for pixel art. Default is 
 ### 5.7 Assets
 
 The browser has no synchronous HTTP file access, and raylib's loaders are synchronous. Assets must be in the
-Emscripten MEMFS before the game loads them. Two supported modes:
+Emscripten MEMFS before the game loads them.
 
-**Bundled (default, simplest)**
+**The M0 spike invalidated the original "the runtime pre-populates the VFS" assumption.**
+`WasmFilesToIncludeInFileSystem` is not implemented by the Blazor SDK: nothing is written to MEMFS and
+`LoadTexture("assets/logo.png")` fails. Every web asset therefore goes through fetch -> `FS.writeFile`
+(spike 0001, 4.1). The two modes differ only in *when* and *how the list is produced*:
 
-```xml
-<WasmFilesToIncludeInFileSystem Include="$(GameAssetsDir)**\*"
-                                TargetPath="assets\%(RecursiveDir)%(Filename)%(Extension)" />
+**Bundled (default)**
+
+- The build emits the list of files under `Assets/` (generated at compile time, not hand-maintained).
+- At boot, before the first frame, JS fetches every file, creates the directories and writes it to MEMFS.
+- The game uses `assets/...` unchanged.
+- Pros: one code path, no manifest to keep in sync, no partial game state. Cons: everything loads before the
+  first frame; big games pay a long startup with only a generic spinner.
+
+```js
+for (const path of assets) {
+    const res = await fetch(new URL(path, document.baseURI));
+    const data = new Uint8Array(await res.arrayBuffer());
+    FS.mkdir("assets");                 // one mkdir per path segment
+    FS.writeFile(path, data);
+}
 ```
 
-The .NET WASM runtime loads these into the virtual filesystem at startup; the game uses `assets/...`
-unchanged. Pros: zero host code, works offline after load, no fetch/progress code. Cons: everything loads
-before the first frame; no per-level grouping; big games pay a long startup with only a generic spinner.
+**Preload groups (for large games, M3)**
 
-**Preload (for large games)**
-
-- A manifest lists files (and optional groups).
-- JS fetches each file, creates directories and writes to MEMFS, reporting progress to the Blazor overlay.
+- A generated manifest lists files and optional groups.
+- JS fetches each file, reporting progress to the Blazor overlay.
 - Groups can be loaded later during a loading screen (`await Context.Assets.LoadGroupAsync("level2")`), but
   never in the middle of `Update` without a loading state.
 - Pros: progress UI, selective loading, smaller initial download if groups are deferred. Cons: more moving
-  parts and a manifest to generate.
+  parts.
 
-**Decision:** implement Bundled for Hello World; add Preload in M3 before porting Wolfrender (5 MB of assets
-and a hardcoded list today). The API should allow both from the start (`GameOptions.AssetMode`).
+**Decision:** Bundled for Hello World; add Preload groups in M3 before porting Wolfrender (5 MB of assets).
+`GameOptions.AssetMode` exists from the start so the API does not change.
+
+**Serving the files:** the shared `Assets/` folder must physically exist under the web host's `wwwroot/assets/`
+before the static web asset manifest is resolved, otherwise the DevServer answers `200` with an empty body.
+Use the copy target from spike 0001, 4.2 (in the framework props, gitignore the generated folder). Do not
+combine it with a `Content ... Link` item: publish then fails with duplicate asset paths.
 
 **Desktop:** the same `Assets/` folder is copied to `assets/` next to the executable; raylib's normal file
 IO reads it. Keep the working directory at the output folder (as Wolfrender does).
@@ -790,14 +887,14 @@ Linux are case-sensitive.
 
 ### 5.9 Desktop parity
 
-`Rayharbor.Desktop` is intentionally tiny:
+`Rayforge.Desktop` is intentionally tiny:
 
 ```csharp
 public static class DesktopRunner
 {
     public static void Run<T>(GameOptions options) where T : IGame, new()
     {
-        SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint);
+        SetConfigFlags(options.ConfigFlags);
         InitWindow(options.Width, options.Height, options.Title);
         SetExitKey(KeyboardKey.Null);          // let the game decide what Escape means
         if (options.EnableAudio) InitAudioDevice();
@@ -851,7 +948,7 @@ README.
 | Gamepad | Not guaranteed in the browser | Treat as unsupported in v1 |
 | Reflection-heavy serialization | Trimming/AOT can break it | Prefer source-generated `System.Text.Json` |
 | `Environment.Exit` | Kills the runtime | Use `Context.Runtime.RequestQuit` |
-| Shaders | GLSL ES (`#version 100`/`300 es`) | Add `#if BROWSER` variants (see Raylib-cs web examples) |
+| Shaders | GLSL ES (`#version 100`/`300 es`) | Select an ES variant at runtime (`Context.IsBrowser`) or ship a uniform shader; avoid `#if BROWSER` in the game library |
 | Screenshots | Works into MEMFS | Add a JS download step if needed |
 | `DateTime.Now`, `Stopwatch` | Work | Fine |
 
@@ -859,50 +956,54 @@ README.
 
 ## 6. Build, packaging and deployment
 
-### 6.1 Native raylib: use Raylib-cs 8.1.0, do not vendor
+### 6.1 Native raylib: Raylib-cs 7.0.2 + a vendored `raylib.a`
 
-The decisive finding: **Raylib-cs 8.1.0 (September 2026) supports `browser-wasm` officially.** The NuGet
-package ships:
+**Decision:** stay on the combination that is already proven in a shipping game:
 
-```
-runtimes/browser-wasm/native/raylib.a
-buildTransitive/Raylib-cs.targets
-```
+| Piece | Version | Where it lives |
+|---|---|---|
+| Raylib-cs | 7.0.2 | `<PackageReference>` in `Rayforge.Core` (flows to everything) |
+| `raylib.a` | raylib 5.6-dev, Emscripten/GLFW build, 1.6 MB | `src/Rayforge.Web/raylib.a`, linked once by the framework |
+| Link flags | `-sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sTOTAL_MEMORY=67108864 -DPLATFORM_WEB` | `buildTransitive/Rayforge.Web.props` |
 
-and the targets, when `RuntimeIdentifier == browser-wasm`:
+The M0 spike confirmed this works in a fresh Blazor app ([spike 0001](spikes/0001-raylib-cs-blazor-wasm.md))
+and found three ABI-only gaps to document: `DrawLineBezierCubic`, `DrawLineBezierQuad` and `GetSoundsPlaying` are
+in the 7.0.2 bindings but missing from this archive. Calling them traps; rebuild `raylib.a` from the matching
+raylib commit if a port needs them.
 
-- add `-sUSE_GLFW=3` to `EmccFlags`;
-- add `NativeFileReference` for the shipped `raylib.a`;
-- (for project references) stage the native library automatically.
+**Why not Raylib-cs 8.1.0 now?** 8.1.0 ships raylib 6.0 plus official `browser-wasm` support
+(`runtimes/browser-wasm/native/raylib.a` and a `buildTransitive` targets file that adds `-sUSE_GLFW=3` and the
+`NativeFileReference`). It is the better long-term answer, but it is a raylib 5.x -> 6.0 API change on top of an
+unproven Blazor path. Review decided to upgrade deliberately later: **M7**, with its own spike (0006).
 
-That removes the need for a committed `raylib.a`, a custom `Raylib.props` and an ABI/version mismatch. It also
-pins raylib to the version the bindings were generated against (raylib 6.0).
+Do not maintain both paths at once. The upgrade replaces `raylib.a`, the custom link flags and the ABI caveats
+in one step.
 
-**Fallback:** if the M0 spike shows that 8.1.0 does not work with Blazor WASM, use the Wolfrender-proven
-combination: Raylib-cs 7.0.2 + a committed Emscripten `raylib.a` (5.6-dev) + `Raylib.props`
-(`WasmBuildNative`, `NativeFileReference`, `-sUSE_GLFW=3`, `-sALLOW_MEMORY_GROWTH=1`,
-`-sFORCE_FILESYSTEM=1`, `-sTOTAL_MEMORY=67108864`). Do not maintain both paths; pick one after M0.
-
-**Consequence for Wolfrender:** Wolfrender is on Raylib-cs 7.0.2/raylib 5.5-era APIs. Raylib-cs 8.x moved to
-raylib 6.0, so porting it is not just a project move; it is an API upgrade. Keep that as a separate track
-(M6) and do not let it block the base.
 
 ### 6.2 MSBuild properties
 
-The framework package (`Rayharbor.Web/buildTransitive/Rayharbor.Web.props`) sets only what the *host* needs
-and leaves app policy to the host:
+The framework package (`Rayforge.Web/buildTransitive/Rayforge.Web.props`) sets only what the *host* needs:
 
 ```xml
 <Project>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
     <WasmBuildNative>true</WasmBuildNative>
     <WasmAllowUndefinedSymbols>true</WasmAllowUndefinedSymbols>
+    <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
     <InvariantGlobalization>true</InvariantGlobalization>
 
-    <!-- Overridable per game. -->
-    <RayharborInitialMemory Condition="'$(RayharborInitialMemory)' == ''">64MB</RayharborInitialMemory>
-    <EmccFlags>$(EmccFlags) -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=$(RayharborInitialMemory)</EmccFlags>
+    <!-- Temporary: -O2 makes the native link run wasm-opt with a flag Binaryen 117
+         does not know (spike 0001, section 4.3). Revisit in M5. -->
+    <EmccLinkOptimizationFlag>-O0</EmccLinkOptimizationFlag>
+
+    <RayforgeInitialMemory Condition="'$(RayforgeInitialMemory)' == ''">64MB</RayforgeInitialMemory>
+    <EmccFlags>$(EmccFlags) -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sTOTAL_MEMORY=$(RayforgeInitialMemory) -DPLATFORM_WEB</EmccFlags>
   </PropertyGroup>
+
+  <!-- Linked once by the framework, so games never carry a native binary. -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
+    <NativeFileReference Include="$(MSBuildThisFileDirectory)..\raylib.a" />
+  </ItemGroup>
 </Project>
 ```
 
@@ -917,9 +1018,12 @@ Host (`HelloWorld.Web.csproj`):
     <ImplicitUsings>enable</ImplicitUsings>
     <WasmGenerateAppBundle>true</WasmGenerateAppBundle>
     <SelfContained>true</SelfContained>
+    <RayforgeHost>Web</RayforgeHost>
+    <RayforgeAssetMode>Bundled</RayforgeAssetMode>
 
-    <!-- Start without AOT; enable for Release after measuring (M2). -->
-    <RunAOTCompilation Condition="'$(Configuration)' == 'Release'">true</RunAOTCompilation>
+    <!-- AOT is opt-in and not part of v1; measured in M5.
+    <RunAOTCompilation>true</RunAOTCompilation>
+    -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -929,7 +1033,7 @@ Host (`HelloWorld.Web.csproj`):
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Rayharbor.Web\Rayharbor.Web.csproj" />
+    <ProjectReference Include="..\..\..\src\Rayforge.Web\Rayforge.Web.csproj" />
     <ProjectReference Include="..\HelloWorld.Game\HelloWorld.Game.csproj" />
   </ItemGroup>
 
@@ -937,44 +1041,58 @@ Host (`HelloWorld.Web.csproj`):
 </Project>
 ```
 
-Notes / things to verify in M0:
+Notes, all confirmed or corrected by the M0 spike:
 
-- `buildTransitive` import order and whether `EmccFlags` is appended cleanly to Raylib-cs's `-sUSE_GLFW=3`.
-- `WasmFilesToIncludeInFileSystem` works under `Microsoft.NET.Sdk.BlazorWebAssembly` (the official example
-  uses the plain WASM SDK).
+- `EmccFlags` from the framework's props append cleanly before the SDK's own link flags (verified in the
+  generated `emcc-link.rsp`).
+- **`WasmFilesToIncludeInFileSystem` does not work with the Blazor SDK.** Assets are fetched at runtime and
+  written into MEMFS instead (spike 0001, 4.1). `Assets.props` must therefore also emit the build-time asset
+  list the host hands to `Rayforge.Web`.
+- **Assets outside `wwwroot` need the copy target** from spike 0001, 4.2 (`Content` + `Link` serves 0 bytes on
+  the DevServer). The target belongs in the framework props, not in each game.
 - `SelfContained=true` is harmless for Blazor WASM.
-- `RunAOTCompilation` is slow; measure Debug vs Release and only enable in Release if it pays off.
-- `WasmEnableExceptionHandling` is not set initially. If exceptions from `[JSExport]` misbehave under AOT,
-  enable it (Wolfrender does).
-- Do **not** set `-sEXPORTED_RUNTIME_METHODS=ccall`; we do not call into raylib from JS.
-- Do **not** duplicate `-sUSE_GLFW=3`; Raylib-cs adds it.
+- `RunAOTCompilation` is slow; keep it off until M5 has numbers.
+- Do **not** set `-sEXPORTED_RUNTIME_METHODS=ccall`; nothing calls into raylib from JS.
+- `-sUSE_GLFW=3` is provided here, once. Raylib-cs 7.0.2 does not add it (8.1.0 does).
+
 
 ### 6.3 RCL packaging
 
-`Rayharbor.Web` is a Razor Class Library (`Microsoft.NET.Sdk.Razor`), `IsPackable=true`,
-`SupportedPlatform=browser`.
+`Rayforge.Web` is a Razor Class Library (`Microsoft.NET.Sdk.Razor`), `IsPackable=true`, with
+`<SupportedPlatform Include="browser" />`.
 
-- Static web assets: `wwwroot/rayharbor.js` is served at
-  `_content/Rayharbor.Web/rayharbor.js`; the component imports it with
-  `JSHost.ImportAsync("rayharbor", "./_content/Rayharbor.Web/rayharbor.js")`.
-  `./` resolves against the document base, so sub-path deployments work.
-- Scoped CSS: `RayharborCanvas.razor.css` styles the container, canvas and overlays. No global CSS file the
+- Static web assets: `wwwroot/rayforge.js` is served at
+  `_content/Rayforge.Web/rayforge.js`. Build the URL from `NavigationManager.BaseUri` **and** pass an absolute
+  URL to `JSHost.ImportAsync`: relative module URLs resolve against `_framework/`, not the document base
+  (spike 0001, 4.4).
+
+  ```csharp
+  var url = new Uri(new Uri(Navigation.BaseUri), "_content/Rayforge.Web/rayforge.js").AbsoluteUri;
+  await JSHost.ImportAsync("rayforge", url);
+  ```
+
+- Scoped CSS: `RayforgeCanvas.razor.css` styles the container, canvas and overlays. No global CSS file the
   host must remember to link.
-- The JS receives the **assembly name** from C# (`typeof(RayharborBridge).Assembly.GetName().Name`) instead
+- The JS receives the **assembly name** from C# (`typeof(RayforgeBridge).Assembly.GetName().Name`) instead
   of hardcoding it, and resolves both `Blazor.runtime` and `getDotnetRuntime(0)`.
 - The canvas ID is generated per component; JS never assumes `"canvas"`.
-- Package dependencies: `Raylib-cs [8.1.0, )`, `Microsoft.AspNetCore.Components.Web 10.0.x`.
-- `buildTransitive` props ship in the package; they must resolve the native library path relative to the
-  package root, not the repo.
+- Package dependencies: `Raylib-cs [7.0.2, )`, `Microsoft.AspNetCore.Components.Web 10.0.x`.
+- `buildTransitive` props ship in the package; they must resolve paths relative to the package root, not
+  the repo. Include them explicitly:
+
+  ```xml
+  <None Include="buildTransitive\**" Pack="true" PackagePath="buildTransitive\" />
+  ```
+
 - Include `README.md`, `LICENSE`, icon, `PackageTags` (`raylib`, `blazor`, `wasm`, `game`).
 
 Pack layout:
 
 ```
-Rayharbor.Web.0.1.0-preview.1.nupkg
-├── lib/net10.0/Rayharbor.Web.dll
+Rayforge.Web.0.1.0-preview.1.nupkg
+├── lib/net10.0/Rayforge.Web.dll
 ├── staticwebassets/...                 # raylib.js, scoped CSS
-├── buildTransitive/Rayharbor.Web.props
+├── buildTransitive/Rayforge.Web.props
 ├── README.md
 └── LICENSE
 ```
@@ -983,15 +1101,17 @@ Rayharbor.Web.0.1.0-preview.1.nupkg
 
 | Task | Command |
 |---|---|
-| Prereqs | `dotnet workload install wasm-tools` (currently **not installed** on this machine) |
+| Prereqs | `dotnet workload install wasm-tools` (installed on this machine during M0) |
 | Run web | `dotnet run --project games/HelloWorld/HelloWorld.Web` |
 | Run desktop | `dotnet run --project games/HelloWorld/HelloWorld.Desktop` |
 | Publish | `dotnet publish games/HelloWorld/HelloWorld.Web -c Release -o artifacts/hello-world` |
-| Serve published | `dotnet serve -d artifacts/hello-world/wwwroot` (or nginx; must serve `application/wasm`) |
+| Serve published | any static server that sends `application/wasm` (see the note below) |
 | Test | `dotnet test` |
 
-- `dotnet run` uses the Blazor DevServer. If Debug + native linking is slow or broken, use
-  `dotnet publish -c Debug` and a static server; document the working path after M0.
+- `dotnet run` uses the Blazor DevServer and works with the asset copy target from M0. Debug is the fast inner
+  loop; there is no need to publish for day-to-day work.
+- **Release publish needs `EmccLinkOptimizationFlag=-O0`** until the `wasm-opt`/Binaryen 117 problem is solved
+  (spike 0001, 4.3). The framework props set it, so hosts do not have to.
 - **Hot reload is disabled for the canvas host.** `dotnet watch` can restart managed code while the native
   raylib window is still initialized, which cannot work. Rebuild + refresh the page. The base should detect
   a second `InitWindow` and show a clear "reload the page" message instead of crashing.
@@ -999,6 +1119,8 @@ Rayharbor.Web.0.1.0-preview.1.nupkg
 - `<base href="./" />` in `index.html` makes sub-path hosting work. No router means no `404.html` fallback is
   strictly needed, but CI copies `index.html` to `404.html` anyway for future routes.
 - Add `.nojekyll` for GitHub Pages.
+- M0 reference numbers for the Hello-World-sized app: **6.2 MB raw / 1.9 MB brotli, 45 files, ~1.1 s to first
+  frame** on localhost without AOT. Use these as the baseline when checking regressions.
 
 ### 6.5 CI and deployment
 
@@ -1011,7 +1133,7 @@ Rayharbor.Web.0.1.0-preview.1.nupkg
 5. `dotnet build -c Release --no-restore`
 6. `dotnet test -c Release --no-build`
 7. `dotnet publish games/HelloWorld/HelloWorld.Web -c Release -o artifacts/hello-world`
-8. Assert key files exist (`_framework/dotnet.wasm`, `_content/Rayharbor.Web/rayharbor.js`, the bundled
+8. Assert key files exist (`_framework/dotnet.wasm`, `_content/Rayforge.Web/rayforge.js`, the bundled
    assets).
 9. Upload `artifacts/hello-world/wwwroot` as an artifact.
 
@@ -1025,13 +1147,16 @@ workload caching until build times are known.
 
 | Component | Version | Notes |
 |---|---|---|
-| .NET SDK | 10.0.4xx | `global.json`, `rollForward: latestFeature` |
+| .NET SDK | 10.0.4xx | `global.json`, `rollForward: latestFeature`; 10.0.402 verified |
 | Blazor WebAssembly | 10.0.x | standalone, no server project |
-| Raylib-cs | 8.1.0 | raylib 6.0, official browser-wasm package |
-| wasm-tools | match SDK | `dotnet workload install wasm-tools` |
-| Emscripten | from wasm-tools | do not mix with a system EMSDK on `PATH` |
+| Raylib-cs | 7.0.2 | raylib 5.x bindings; upgrade to 8.1.0 is M7 |
+| raylib (native) | 5.6-dev, Emscripten/GLFW | vendored `raylib.a` (1.6 MB) in `Rayforge.Web` |
+| wasm-tools | 10.0.13 | `dotnet workload install wasm-tools` |
+| Emscripten | 3.1.56 (from wasm-tools) | do not mix with a system EMSDK on `PATH` |
+| Binaryen | 117 (from wasm-tools) | rejects `--enable-bulk-memory-opt`; see 4.3 in spike 0001 |
 | xUnit | current | unit + architecture tests |
-| Playwright | current | optional browser smoke test |
+| Playwright | current | browser smoke test (M5) |
+
 
 ---
 
@@ -1040,7 +1165,7 @@ workload caching until build times are known.
 Full spec and acceptance criteria: [HELLO-WORLD.md](HELLO-WORLD.md). Summary:
 
 - **Goal:** prove the whole stack and the portability contract with the smallest interesting game.
-- **Visual:** dark background, rotating 3D cube, "Hello, Rayharbor!" text, a small logo texture, mouse
+- **Visual:** dark background, rotating 3D cube, "Hello, Rayforge!" text, a small logo texture, mouse
   marker, FPS/resolution readout.
 - **Input:** Space toggles rotation, click plays a short beep and spawns a fading ring, F toggles fullscreen,
   R resets. Mouse marker must track correctly at every scale.
@@ -1094,17 +1219,20 @@ Wolfrender is the large case (M6), not the first port. Known blockers:
 
 ## 9. Roadmap
 
-| Milestone | Deliverable | Exit criteria |
-|---|---|---|
-| **M0 - Spike** (0.5-1 day) | Throwaway Blazor app using Raylib-cs 8.1.0: canvas, `InitWindow`, clear + text, rAF `[JSExport]` loop, bundled asset, click beep, resize/mouse scale. | Runs in Chrome and Firefox; publish + static serve works; findings written to `docs/spikes/0001-*.md`; go/no-go on 8.1.0. |
-| **M1 - Skeleton** | Solution, 3 framework projects, `IGame`/`GameContext`, host boots to a Razor loading screen, CI build. | `dotnet build` green; dependency rules documented; no game logic. |
-| **M2 - Hello World** | Base canvas component, JS bridge, desktop runner, Hello World game + hosts, bundling, audio, resize, error/loading overlays. | All Hello World acceptance criteria pass; same game on desktop and web. |
-| **M3 - Real port** | Preload/manifest assets, pointer lock/mouse look, diagnostics, DoomFire port. | DoomFire runs on web and desktop; porting guide validated; list of friction points. |
-| **M4 - Template & packages** | `dotnet new raylib-game`, packable `Rayharbor.Core/Web/Desktop`, local feed, docs. | A new game can be created and run from the template without touching the base source. |
-| **M5 - CI & deploy** | GitHub Actions publish, Pages deploy, Playwright smoke test, size/time report. | Green CI on a clean runner; deployed demo URL; smoke test catches a blank canvas. |
-| **M6 - Wolfrender port** (separate track) | Port Wolfrender onto Rayharbor. | Game playable in the browser; no Wolfrender-specific code in the base. |
+The authoritative tracker, with per-milestone checklists, is [MILESTONES.md](MILESTONES.md). Summary:
 
-M0 is the decision gate. Do not build M1-M2 until the 8.1.0-in-Blazor question is answered.
+| Milestone | Deliverable | Exit criteria | Status |
+|---|---|---|---|
+| **M0 - Spike** | Throwaway Blazor app proving the decided stack. | Renders + audio + assets + letterboxed mouse mapping; DevServer and static publish work; findings written. | **Done 2026-10-21** |
+| **M1 - Skeleton** | Solution, 3 framework projects, `IGame`/`GameContext`, host boots to a Razor loading screen, CI build. | `dotnet build` green; dependency rules documented; no game logic. | Next |
+| **M2 - Hello World** | Base canvas component, JS bridge, desktop runner, Hello World game + hosts, assets, audio, resize, error/loading overlays. | All Hello World acceptance criteria pass; same game on desktop and web. | Planned |
+| **M3 - Real port** | Preload/manifest assets, pointer lock/mouse look, diagnostics, DoomFire port. | DoomFire runs on web and desktop; porting guide validated; friction list written. | Planned |
+| **M4 - Template & packages** | `dotnet new rayforge-game`, packable `Rayforge.Core/Web/Desktop`, local feed, docs. | A new game can be created and run from the template without touching the base source. | Planned |
+| **M5 - CI & deploy** | GitHub Actions publish, Pages deploy, Playwright smoke test, size/time report, AOT measurement. | Green CI on a clean runner; deployed demo URL; smoke test catches a blank canvas. | Planned |
+| **M6 - Wolfrender port** (separate track) | Port Wolfrender onto Rayforge. | Playable in the browser; no Wolfrender-specific code in the base. | Planned |
+| **M7 - Raylib upgrade** | Raylib-cs 8.1.0 / raylib 6.0, drop the vendored `raylib.a`. | Base + Hello World green on 8.1.0, no regressions. | Planned |
+
+M0 closed the decision gate. M1 is the next action.
 
 ---
 
@@ -1112,50 +1240,56 @@ M0 is the decision gate. Do not build M1-M2 until the 8.1.0-in-Blazor question i
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Raylib-cs 8.1.0 browser-wasm does not work with Blazor (only with the plain WASM SDK) | Medium | High | M0 spike first; fallback to 7.0.2 + Wolfrender's proven `raylib.a` + props. |
-| raylib 6.0 API changes make porting existing games expensive | High for Wolfrender | Medium | Separate M6; base stays at 8.1.0; document the diff; don't port during base work. |
-| `wasm-tools` / SDK / Emscripten mismatch (`wasm-opt` errors) | Medium | Medium | Pin SDK in `global.json`; `dotnet workload update`; official example's `-O0` link fallback; CI installs the workload fresh. |
-| AOT build time/size is unacceptable | Medium | Medium | Start interpreter/Debug; enable AOT only in Release after measuring; record numbers. |
+| Release publish breaks on `wasm-opt --enable-bulk-memory-opt` (Binaryen 117) | **Certain today** | Medium | `EmccLinkOptimizationFlag=-O0` in the framework props; solve properly in M5 (workload update / SDK band / patched rsp). |
+| Asset build plumbing is fragile (`Link` -> 0-byte DevServer response) | High | Medium | Copy target before `ResolveStaticWebAssetsInputs` (spike 0001, 4.2); gitignore the generated folder; CI asserts a published asset is non-empty. |
+| ABI drift between Raylib-cs 7.0.2 and the 5.6-dev `raylib.a` | Medium | Medium | Document the three missing symbols; rebuild `raylib.a` from the matching commit if a port needs them; M7 removes the pairing. |
+| raylib 6.0 API changes make porting existing games expensive | High for Wolfrender | Medium | M7 after the base is stable; Wolfrender is M6; document the diff. |
+| `wasm-tools` / SDK / Emscripten mismatch | Medium | Medium | Pin SDK in `global.json`; CI installs the workload fresh; record the versions in `MILESTONES.md`. |
+| AOT build time/size is unacceptable | Medium | Medium | Interpreter by default; AOT measured in M5 before any policy change. |
 | Asset memory blow-up (MEMFS + decoded textures/audio) | Medium | Medium | Bundled only for small games; Preload groups for large ones; `ALLOW_MEMORY_GROWTH`; document limits. |
 | Blazor render and game loop compete for the main thread | Low-Medium | Medium | No per-frame Blazor; overlays only; measure frame time with the diagnostics overlay. |
 | Pointer lock/audio/fullscreen gestures behave differently across browsers | Medium | Medium | Start overlay; test Chrome/Firefox/Safari; degrade gracefully; document unsupported features. |
-| HiDPI/mouse mapping bugs | Medium | Medium | Fit mode + `SetMouseScale`; unit-test layout math; manual DPR/zoom matrix. |
-| Hot reload / remount double-inits raylib | High (if using `dotnet watch`) | Low | Disable hot reload for the canvas; guard against a second init; show "reload" message. |
-| GitHub Pages sub-path breaks absolute URLs | Low | Medium | `<base href="./">`; relative JS/asset URLs; test under `/repo/`. |
+| HiDPI/mouse mapping bugs | Low now | Medium | Fit mode + `SetMouseScale` verified at 3 CSS scales and DPR 2; unit-test layout math; keep the manual matrix. |
+| Hot reload / remount double-inits raylib | High (with `dotnet watch`) | Low | Disable hot reload for the canvas; guard against a second init; show "reload" message. |
+| GitHub Pages sub-path breaks absolute URLs | Low | Medium | `<base href="./">`; build JS module + asset URLs from `NavigationManager.BaseUri`; test under `/repo/`. |
 | Trimming/AOT breaks reflection-based game code | Medium | Medium | Prefer source-generated JSON; document trim warnings; `TrimmerRootAssembly` escape hatch per game. |
-| Base creeps into an engine | High over time | High | Explicit non-goals; keep `Rayharbor.Core` tiny; reject PRs that add scene/physics/editor features. |
-| Licence/attribution mistake | Low | Medium | MIT for our code; keep raylib/raylib-cs notices; no Wolfrender code copied. |
+| Base creeps into an engine | High over time | High | Explicit non-goals; keep `Rayforge.Core` tiny; reject PRs that add scene/physics/editor features. |
+| License/attribution mistake | Low | Medium | MIT for our code; keep raylib/raylib-cs notices; no Wolfrender code copied. |
 
 ---
 
-## 11. Decisions needed from review
+## 11. Decisions (recorded)
 
-Please answer these before M1. Defaults are in **bold**.
+These were decided in review on 2026-10-21, before M0:
 
-1. **Name:** **Rayharbor** / Slipway / Rayport / Porthole / Rayforge / other?
-2. **Structure:** **A (layered monorepo)** / B (base + game app) / C (NuGet-first) / D (single project)?
-3. **Raylib baseline:** **Raylib-cs 8.1.0 (raylib 6.0, official WASM)** / stay on 7.0.2 for Wolfrender
-   compatibility?
-4. **Desktop parity now?** **Yes, thin `Rayharbor.Desktop`** / later / no?
-5. **Default canvas mode:** **Fit (fixed logical resolution)** / Fill (responsive) / both with Fit default?
-6. **Default asset mode:** **Bundled** / Preload / both (Bundled first)?
-7. **AOT:** interpreter in Debug, **AOT in Release (measure first)** / AOT everywhere / never?
-8. **Repo layout:** `src/` + `games/` + `tests/` + `templates/` as in 4.4 / flatter / different names?
-9. **Licence:** **MIT** / other?
-10. **Package IDs/remote:** reserve `Rayharbor.*` on NuGet? GitHub org/user for the remote?
-11. **Multi-game host:** **no** (one host per game; gallery later) / yes?
-12. **First real port:** **DoomFire-Raylib** / another small game / none (Hello World only)?
-13. **Wolfrender as M6:** **yes, separate track** / not planned / do it earlier?
-14. **Target browsers:** Chrome + Firefox first, Safari best-effort? Mobile out of scope?
+1. **Name:** Rayforge.
+2. **Structure:** Alternative A (layered monorepo), evolving into C (packages) at M4.
+3. **Raylib baseline:** stay on Raylib-cs 7.0.2 + vendored `raylib.a`; upgrade later (M7).
+4. **Desktop parity in scope from day one:** yes.
+5. **Canvas mode:** both Fit and Fill, Fit by default.
+6. **Asset mode:** Bundled (semantics corrected by M0, see 5.7).
+7. **AOT:** not in v1; revisit in M5.
+8. **License:** MIT.
+9. **First real port:** DoomFire-Raylib (M3).
+10. **Remote:** public GitHub repository `kenwi/Rayforge`.
+11. **Milestones:** tracked in [MILESTONES.md](MILESTONES.md).
+12. **Wolfrender:** M6, separate track.
+13. **Multi-game host:** no (one host per game; gallery later).
 
-Also worth deciding now: should the docs use British or American spelling, and should the repo be public from
-the start? (The current docs mix "licence"/"license"; pick one.)
+Still open (do not block M1):
+
+| Question | Needed by |
+|---|---|
+| NuGet package IDs (`Rayforge.Core` etc.) - check availability before packing | M4 |
+| Default target browsers (Chrome + Firefox first, Safari best-effort; mobile out of scope?) | M2 |
+| Whether the three missing raylib entry points matter for real games, or `raylib.a` gets rebuilt | M1/M3 |
+| Whether `dotnet workload update` fixes the Release `wasm-opt` failure | M5 |
 
 ---
 
 ## 12. References
 
-- Raylib-cs 8.1.0: <https://github.com/raylib-cs/raylib-cs/releases/tag/v8.1.0>
+- Raylib-cs 8.1.0 (the M7 target): <https://github.com/raylib-cs/raylib-cs/releases/tag/v8.1.0>
   - browser-wasm support, `runtimes/browser-wasm/native/raylib.a`, `buildTransitive/Raylib-cs.targets`
   - web example: `Examples/Web/{README.md,Host.cs,main.js,index.html,scaleUtils.js}`
 - Raylib 6.0: <https://github.com/raysan5/raylib/releases/tag/6.0>
@@ -1163,18 +1297,22 @@ the start? (The current docs mix "licence"/"license"; pick one.)
   <https://learn.microsoft.com/aspnet/core/blazor/webassembly-native-dependencies>
 - Blazor.Raylib (MIT): <https://github.com/trucidare/Blazor.Raylib>
 - DotnetRaylibWasm: <https://github.com/stanoddly/DotnetRaylibWasm>
-- Existing project: `~/Work/Wolfrender.Blazor.Raylib/OVERVIEW.md`, `Components/Raylib.razor.cs`,
-  `wwwroot/js/raylib.js`, `Raylib.props`
+- Reference implementation (behaviour only, no code copied): `~/Work/Wolfrender.Blazor.Raylib/OVERVIEW.md`,
+  `Components/Raylib.razor.cs`, `wwwroot/js/raylib.js`, `Raylib.props`
+- M0 evidence: [spikes/0001-raylib-cs-blazor-wasm.md](spikes/0001-raylib-cs-blazor-wasm.md),
+  [`spike/m0-raylib-blazor/`](../spike/m0-raylib-blazor)
 
 ---
 
-## 13. Review checklist (short version)
+## 13. Review checklist
 
-- [ ] Name approved (or shortlist narrowed).
-- [ ] Structure A/B/C chosen.
-- [ ] Raylib-cs 8.1.0 accepted as the baseline (with 7.0.2 fallback).
-- [ ] Desktop host in scope.
-- [ ] Canvas mode + asset mode defaults agreed.
-- [ ] AOT policy agreed.
-- [ ] Licence + package IDs decided.
-- [ ] M0 spike approved as the next action.
+- [x] Name approved: Rayforge.
+- [x] Structure chosen: A (layered monorepo).
+- [x] Raylib baseline agreed: 7.0.2 + vendored `raylib.a`; 8.1.0 deferred to M7.
+- [x] Desktop host in scope.
+- [x] Canvas mode (both, Fit default) and asset mode (Bundled) agreed.
+- [x] AOT policy agreed (later, measured in M5).
+- [x] License (MIT) and remote (`kenwi/Rayforge`, public) decided.
+- [x] M0 spike completed and accepted: GO.
+- [ ] M1 skeleton approved as the next action.
+

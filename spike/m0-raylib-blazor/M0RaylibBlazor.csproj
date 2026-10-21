@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <WasmGenerateAppBundle>true</WasmGenerateAppBundle>
+    <SelfContained>true</SelfContained>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>M0</RootNamespace>
+    <AssemblyName>M0RaylibBlazor</AssemblyName>
+    <!-- The spike is a probe, not a product: no AOT. -->
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.*" PrivateAssets="all" />
+    <PackageReference Include="Raylib-cs" Version="7.0.2" />
+  </ItemGroup>
+
+  <!-- Bundled assets: loaded into the Emscripten VFS at startup. -->
+  <ItemGroup>
+    <WasmFilesToIncludeInFileSystem Include="Assets\**\*"
+                                    TargetPath="assets\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- Same files, also exposed over HTTP.
+       Static web assets map a Content item to the physical path implied by its Link, so
+       assets must physically exist under wwwroot/ before the manifest is resolved. This
+       is the only way to keep one shared Assets/ folder for the web and desktop hosts. -->
+  <ItemGroup>
+    <GameAsset Include="Assets\**\*" />
+  </ItemGroup>
+
+  <Target Name="SyncGameAssetsIntoWwwroot"
+          BeforeTargets="ResolveStaticWebAssetsInputs">
+    <Copy SourceFiles="@(GameAsset)"
+          DestinationFiles="@(GameAsset->'$(MSBuildProjectDirectory)\wwwroot\assets\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Include="wwwroot\assets\**\*" Exclude="@(Content)" />
+    </ItemGroup>
+  </Target>
+
+  <Import Project="Raylib.props" />
+
+</Project>

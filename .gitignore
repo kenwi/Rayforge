@@ -23,3 +23,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Spike: assets synced into the host's wwwroot by the build (see the M0 spike).
+spike/**/wwwroot/assets/
+

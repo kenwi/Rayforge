@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  M0 spike only. Statically links a prebuilt Emscripten raylib (5.6-dev) against the
+  Raylib-cs 7.0.2 bindings. This is the Wolfrender-proven path, reproduced in a fresh
+  Blazor project to check that it does not depend on Wolfrender specifics.
+-->
+<Project>
+
+  <PropertyGroup>
+    <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
+    <WasmBuildNative>true</WasmBuildNative>
+    <WasmAllowUndefinedSymbols>true</WasmAllowUndefinedSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <NativeFileReference Include="$(MSBuildThisFileDirectory)raylib.a" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <EmccFlags>$(EmccFlags) -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sTOTAL_MEMORY=67108864 -DPLATFORM_WEB</EmccFlags>
+  </PropertyGroup>
+
+</Project>

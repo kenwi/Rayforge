@@ -1,4 +1,4 @@
-# Porting a Raylib-cs game to Rayharbor
+# Porting a Raylib-cs game to Rayforge
 
 Draft guide. It will be validated in M3 by porting DoomFire-Raylib, then in M6 by porting Wolfrender.
 Status: **not yet tested against a real port**.
@@ -7,7 +7,7 @@ Status: **not yet tested against a real port**.
 
 ## 0. What "port" means here
 
-Rayharbor does **not** translate code or emulate a desktop. It changes the *host* of a C#/Raylib game:
+Rayforge does **not** translate code or emulate a desktop. It changes the *host* of a C#/Raylib game:
 
 - the game becomes a `net10.0` class library implementing `IGame`;
 - a Blazor WASM host owns the canvas, the window, audio and the frame loop;
@@ -50,8 +50,8 @@ games/<Name>/
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Rayharbor.Core\Rayharbor.Core.csproj" />
-    <PackageReference Include="Raylib-cs" Version="8.1.0" />
+    <ProjectReference Include="..\..\..\src\Rayforge.Core\Rayforge.Core.csproj" />
+    <PackageReference Include="Raylib-cs" Version="7.0.2" />
   </ItemGroup>
 </Project>
 ```
@@ -137,7 +137,7 @@ Key mechanical rules:
 Web `Program.cs`:
 
 ```csharp
-builder.Services.AddRayharbor<MyGame>(o =>
+builder.Services.AddRayforge<MyGame>(o =>
 {
     o.Title = "My Game";
     o.Width = 1280;
@@ -148,7 +148,7 @@ builder.Services.AddRayharbor<MyGame>(o =>
 });
 ```
 
-`App.razor`: `<RayharborCanvas />`.
+`App.razor`: `<RayforgeCanvas />`.
 
 Desktop `Program.cs`:
 
@@ -232,7 +232,7 @@ Go through this list before declaring the port done.
 - [ ] Audio starts after a user gesture (`RequireUserGesture=true`).
 - [ ] `InitAudioDevice` failure is handled (`Context.AudioAvailable`).
 - [ ] Music/sounds are preloaded; no streaming from HTTP.
-- [ ] OGG/WAV/MP3 only; check licences and file sizes.
+- [ ] OGG/WAV/MP3 only; check licenses and file sizes.
 - [ ] No audio-thread assumptions (callbacks) unless tested on web.
 
 ### Assets and IO
@@ -242,7 +242,7 @@ Go through this list before declaring the port done.
       in the VFS; arbitrary directories do not.
 - [ ] Writes go to MEMFS (lost on reload) or browser storage via JS.
 - [ ] Asset sizes are known; initial memory stays within `INITIAL_MEMORY` + growth.
-- [ ] Fonts are licenced and loaded via `assets/...`.
+- [ ] Fonts are licensed and loaded via `assets/...`.
 
 ### Data and .NET
 
@@ -295,7 +295,7 @@ Known work items:
 
 | Area | Change |
 |---|---|
-| Raylib version | 7.0.2/raylib 5.5 -> 8.1.0/raylib 6.0; fix renamed/changed APIs |
+| Raylib version | Same 7.0.2/raylib 5.6-dev baseline in v1; the 8.1.0/raylib 6.0 upgrade is M7 |
 | Project split | `Source/Core`, `Engine`, `Features` -> `Wolfrender.Game`; remove `Components/Raylib*`, pages, JS |
 | Lifecycle | `Application`/`World` loop -> `IGame`; `InitWindow`/`CloseWindow` out |
 | Assets | `wwwroot/resources` (5.1 MB) -> `Assets/`; hardcoded preload list -> manifest/groups |
@@ -308,9 +308,8 @@ Known work items:
 | UI | options/debug console overlays -> decide: raylib-drawn (portable) or Blazor HTML (web-only) |
 | Tests | `World`/systems can be unit-tested as a plain library once the split is done |
 
-Recommended order: split the game into a library with no Blazor references *first* (still on 7.0.2 if
-needed), get the desktop host running, then upgrade raylib, then add the web host. Each step is independently
-verifiable.
+Recommended order: split the game into a library with no Blazor references *first* (keeping 7.0.2), get the
+desktop host running, then add the web host. Do not combine the split with the M7 raylib upgrade.
 
 ---
 
@@ -318,15 +317,19 @@ verifiable.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Cannot find native library 'raylib'` / unresolved symbol | RID not `browser-wasm`, Raylib-cs targets not imported, or `WasmBuildNative` false | Set `RuntimeIdentifier=browser-wasm`, `WasmBuildNative=true`, `WasmAllowUndefinedSymbols=true`; reference Raylib-cs 8.1.0; check restore assets |
-| `wasm-opt: Unknown option '--enable-bulk-memory-opt'` | wasm-tools/Binaryen out of sync with the SDK, or a system EMSDK on `PATH` | `dotnet workload update`; pin SDK; remove system EMSDK from `PATH`; fallback `-O0` link flags |
+| `Cannot find native library 'raylib'` / unresolved symbol | RID not `browser-wasm`, `NativeFileReference` missing, or `WasmBuildNative` false | Set `RuntimeIdentifier=browser-wasm`, `WasmBuildNative=true`, `WasmAllowUndefinedSymbols=true`; make sure the framework props are imported; check `obj/.../wasm/for-build/*.rsp` |
+| Link warnings for `DrawLineBezierCubic`, `DrawLineBezierQuad`, `GetSoundsPlaying` | Raylib-cs 7.0.2 bindings vs the 5.6-dev `raylib.a` | Harmless unless called; rebuild `raylib.a` from the matching commit, or wait for M7 |
+| `wasm-opt: Unknown option '--enable-bulk-memory-opt'` | Release link with Binaryen 117 (spike 0001, 4.3) | `EmccLinkOptimizationFlag=-O0` (temporary); try `dotnet workload update`; remove system EMSDK from `PATH` |
 | Black canvas, no errors | Canvas not bound before `InitWindow`, or `Module.canvas` is the wrong module | Bind via `Blazor.runtime.Module['canvas']` in `OnAfterRenderAsync`; verify `canvas.id` |
 | Black canvas after hot reload | raylib window already initialized | Disable hot reload; full page reload; guard second init |
+| `GET /_framework/js/...` 404 / dynamic import fails | `JSHost.ImportAsync` resolves relative URLs against `_framework/` | Pass an absolute URL built from `NavigationManager.BaseUri` |
 | Keyboard does nothing | Canvas not focused | `tabindex=0`, focus on click; check Emscripten GLFW listeners |
 | Mouse marker offset | CSS scaling without `SetMouseScale`, or DPR mismatch | Fit mode + `SetMouseScale(backing/css)`; test at DPR 1/2 and zoom |
 | Audio silent / autoplay warning | `InitAudioDevice` before a gesture | Click-to-start; init audio synchronously in the click handler |
-| Assets 404 / `LoadTexture` fails | File not in VFS, wrong case, leading slash | Bundled/Preload correctness; lowercase relative `assets/...` |
+| Assets 404 / `LoadTexture` fails | Not written into MEMFS, wrong case, leading slash | Fetch into MEMFS at boot (spike 0001, 4.1); lowercase relative `assets/...` |
+| DevServer serves an asset with HTTP 200 and 0 bytes | `Content` item with `Link="wwwroot\..."` but no physical file there | Use the copy-target recipe (spike 0001, 4.2); do not mix it with `Content ... Link` |
 | `InitWindow` works in Debug, crashes in Release | AOT/trimming removed something; exception handling | Enable `WasmEnableExceptionHandling`; add trim roots; test AOT separately |
+| A click never registers | Press and release land in the same frame; raylib samples button state per frame | Hold the button >= 1 frame; do not build UI on sub-frame taps |
 | Extremely slow Debug | AOT forced on in Debug | `RunAOTCompilation` only in Release |
 | Frame rate pegged at 100% CPU | raylib `SetTargetFPS` busy-wait on web | Remove it; let rAF pace; host `TargetFps` |
 | Huge download / OOM | All assets bundled + decoded | Preload groups; compress audio; reduce texture sizes; raise initial memory |
