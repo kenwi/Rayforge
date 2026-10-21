@@ -51,7 +51,7 @@ games/<Name>/
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Rayforge.Core\Rayforge.Core.csproj" />
-    <PackageReference Include="Raylib-cs" Version="7.0.2" />
+    <PackageReference Include="Raylib-cs" Version="8.1.0" />
   </ItemGroup>
 </Project>
 ```
@@ -295,7 +295,7 @@ Known work items:
 
 | Area | Change |
 |---|---|
-| Raylib version | Same 7.0.2/raylib 5.6-dev baseline in v1; the 8.1.0/raylib 6.0 upgrade is M7 |
+| Raylib version | Wolfrender is on 5.x; Rayforge is raylib 6.0 / Raylib-cs 8.1.0. Adapt in a separate commit (see [UPGRADING-RAYLIB.md](UPGRADING-RAYLIB.md)) |
 | Project split | `Source/Core`, `Engine`, `Features` -> `Wolfrender.Game`; remove `Components/Raylib*`, pages, JS |
 | Lifecycle | `Application`/`World` loop -> `IGame`; `InitWindow`/`CloseWindow` out |
 | Assets | `wwwroot/resources` (5.1 MB) -> `Assets/`; hardcoded preload list -> manifest/groups |
@@ -308,8 +308,9 @@ Known work items:
 | UI | options/debug console overlays -> decide: raylib-drawn (portable) or Blazor HTML (web-only) |
 | Tests | `World`/systems can be unit-tested as a plain library once the split is done |
 
-Recommended order: split the game into a library with no Blazor references *first* (keeping 7.0.2), get the
-desktop host running, then add the web host. Do not combine the split with the M7 raylib upgrade.
+Recommended order: split the game into a library with no Blazor references *first* (keeping its current raylib
+version), get the desktop host running, then add the web host. Do not combine the split with a raylib upgrade -
+that gets its own commit and its own checklist ([UPGRADING-RAYLIB.md](UPGRADING-RAYLIB.md)).
 
 ---
 
@@ -317,8 +318,8 @@ desktop host running, then add the web host. Do not combine the split with the M
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Cannot find native library 'raylib'` / unresolved symbol | RID not `browser-wasm`, `NativeFileReference` missing, or `WasmBuildNative` false | Set `RuntimeIdentifier=browser-wasm`, `WasmBuildNative=true`, `WasmAllowUndefinedSymbols=true`; make sure the framework props are imported; check `obj/.../wasm/for-build/*.rsp` |
-| Link warnings for `DrawLineBezierCubic`, `DrawLineBezierQuad`, `GetSoundsPlaying` | Raylib-cs 7.0.2 bindings vs the 5.6-dev `raylib.a` | Harmless unless called; rebuild `raylib.a` from the matching commit, or wait for M7 |
+| `Cannot find native library 'raylib'` / unresolved symbol | RID not `browser-wasm`, `WasmBuildNative` false, or the Raylib-cs package reference is missing | Set `RuntimeIdentifier=browser-wasm` on the **web host**, `WasmBuildNative=true`; reference `Raylib-cs` (it supplies the archive); check `obj/.../wasm/for-build/*.rsp` |
+| `undefined symbol: ...` at link time | A native archive that does not match the Raylib-cs bindings (typically a vendored `raylib.a`) | Delete the extra archive / `NativeFileReference`; use the package's `runtimes/browser-wasm/native/raylib.a`; do not set `WasmAllowUndefinedSymbols` |
 | `wasm-opt: Unknown option '--enable-bulk-memory-opt'` | Release link with Binaryen 117 (spike 0001, 4.3) | `EmccLinkOptimizationFlag=-O0` (temporary); try `dotnet workload update`; remove system EMSDK from `PATH` |
 | Black canvas, no errors | Canvas not bound before `InitWindow`, or `Module.canvas` is the wrong module | Bind via `Blazor.runtime.Module['canvas']` in `OnAfterRenderAsync`; verify `canvas.id` |
 | Black canvas after hot reload | raylib window already initialized | Disable hot reload; full page reload; guard second init |

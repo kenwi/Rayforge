@@ -13,7 +13,7 @@ Status: **specification**, implemented in M2. M0 already validated the pieces th
 
 | Concern | How the demo exercises it |
 |---|---|
-| Static native linking | raylib 5.6-dev via a vendored `raylib.a` and Raylib-cs 7.0.2 (the decided baseline; 8.1.0 is M7) |
+| Static native linking | raylib 6.0 from the Raylib-cs 8.1.0 package (`runtimes/browser-wasm/native/raylib.a`) - no vendored binary |
 | Game/host boundary | `HelloWorldGame` is a `net10.0` class library with zero Blazor/WASM references |
 | Desktop parity | The identical game class runs in `HelloWorld.Desktop` |
 | Frame loop | rAF-driven `Update(dt)` + `Draw()`; no blocking loop |

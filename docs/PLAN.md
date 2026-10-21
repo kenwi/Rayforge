@@ -1,6 +1,6 @@
 # Rayforge - Architecture & Implementation Plan
 
-> Status: **decisions taken, M0 spike complete.** Implementation starts at M1.
+> Status: **decisions taken, M0 + M0b spikes complete.** Implementation starts at M1 on Raylib-cs 8.1.0.
 > Date: 2026-10-21
 > Repository: `~/Work/Rayforge` -> `kenwi/Rayforge` (public, MIT)
 > Milestone tracker: [MILESTONES.md](MILESTONES.md)
@@ -14,7 +14,7 @@
 | 1 | Name | **Rayforge**. Alternatives kept in section 3. |
 | 2 | Repository shape | **Alternative A - layered monorepo**: `src/` framework + `games/<Game>/` with `.Game`, `.Web`, `.Desktop`. |
 | 3 | Base + game separation | The game is a **plain `net10.0` class library**; the Blazor app is a **thin host**. The base is never copied into a game. |
-| 4 | Raylib baseline | **Raylib-cs 7.0.2 + vendored `raylib.a` (raylib 5.6-dev)** - the Wolfrender-proven combination. The official 8.1.0 `browser-wasm` package is evaluated later, in M7. |
+| 4 | Raylib baseline | **Raylib-cs 8.1.0** (bindings + native raylib 6.0 + `runtimes/browser-wasm/native/raylib.a` from the package). No vendored binary, no custom props file. Settled by spike 0002 (M0b). |
 | 5 | Who owns the window/loop | The **host** owns `InitWindow` / `InitAudioDevice` / the frame loop. The game implements `IGame` (`Initialize`, `Update`, `Draw`, `OnResize`, `Dispose`). |
 | 6 | Frame loop | `requestAnimationFrame` in JS calls **one synchronous `[JSExport]`** per frame. No blocking `while` loop, no per-frame `async Task`, no per-frame C#->JS calls. |
 | 7 | Canvas sizing | **Both modes**: **Fit** (fixed logical resolution, CSS letterboxing, `SetMouseScale`) and **Fill** (backing store = CSS pixels, responsive). Fit is the default. HiDPI is a later mode. |
@@ -30,6 +30,11 @@
 **M0 completed 2026-10-21: GO.** The stack renders in a fresh Blazor app (3D + 2D + texture + audio + letterboxed
 mouse mapping, on the DevServer and from a static publish). Evidence, measurements and the four plan corrections:
 [spikes/0001-raylib-cs-blazor-wasm.md](spikes/0001-raylib-cs-blazor-wasm.md).
+
+**M0b completed 2026-10-21: GO.** Raylib-cs 8.1.0 replaces the vendored `raylib.a` and `Raylib.props` with no
+behaviour change, zero undefined symbols, and a 2.7 % smaller payload:
+[spikes/0002-raylib-cs-8.1.0.md](spikes/0002-raylib-cs-8.1.0.md). The upgrade workflow is
+[UPGRADING-RAYLIB.md](UPGRADING-RAYLIB.md).
 
 
 ---
@@ -99,8 +104,8 @@ game contract, not a refactor of Wolfrender.
 - **`DotnetRaylibWasm`** is an archived .NET 7 prototype for raylib 4.x. It is a great reference for the
   Emscripten/MSBuild tricks, not a maintained base.
 - **`Raylib-cs` 8.1.0** ships official `browser-wasm` support (`raylib.a` + `buildTransitive` targets), which
-  removes the main reason to carry a custom props file. It is the natural upgrade target (M7), but the review
-  chose the already-proven 7.0.2 + vendored `raylib.a` pair for v1.
+  removes the main reason to carry a custom props file. **We adopt it** (spike 0002): the base takes the
+  native archive, the `-sUSE_GLFW=3` flag and the desktop RID natives from the package.
 
 The official Raylib-cs web example is still the reference for the native/JS loop; Rayforge adds the Blazor
 host, game contract, desktop parity, overlays and packaging around the same technique.
@@ -956,28 +961,36 @@ README.
 
 ## 6. Build, packaging and deployment
 
-### 6.1 Native raylib: Raylib-cs 7.0.2 + a vendored `raylib.a`
+### 6.1 Native raylib: Raylib-cs 8.1.0, native from the package
 
-**Decision:** stay on the combination that is already proven in a shipping game:
+**Decision:** take everything from the NuGet package. There is no native binary in the repository.
 
 | Piece | Version | Where it lives |
 |---|---|---|
-| Raylib-cs | 7.0.2 | `<PackageReference>` in `Rayforge.Core` (flows to everything) |
-| `raylib.a` | raylib 5.6-dev, Emscripten/GLFW build, 1.6 MB | `src/Rayforge.Web/raylib.a`, linked once by the framework |
-| Link flags | `-sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sTOTAL_MEMORY=67108864 -DPLATFORM_WEB` | `buildTransitive/Rayforge.Web.props` |
+| Raylib-cs | 8.1.0 | `<PackageReference>` in `Rayforge.Core` (flows to everything) |
+| `raylib.a` (web) | raylib 6.0, Emscripten/GLFW, 1.36 MB | the package: `runtimes/browser-wasm/native/raylib.a` |
+| Desktop natives | raylib 6.0 | the package: `linux-x64`, `osx-x64`, `osx-arm64`, `win-x64`, `win-x86` |
+| Link flags | `-sUSE_GLFW=3` only | the package: `buildTransitive/Raylib-cs.targets` |
+| Our props | `WasmBuildNative`, `EmccLinkOptimizationFlag=-O0`, `InvariantGlobalization` | `buildTransitive/Rayforge.Web.props` |
 
-The M0 spike confirmed this works in a fresh Blazor app ([spike 0001](spikes/0001-raylib-cs-blazor-wasm.md))
-and found three ABI-only gaps to document: `DrawLineBezierCubic`, `DrawLineBezierQuad` and `GetSoundsPlaying` are
-in the 7.0.2 bindings but missing from this archive. Calling them traps; rebuild `raylib.a` from the matching
-raylib commit if a port needs them.
+The package's `buildTransitive` targets add `-sUSE_GLFW=3` and the `NativeFileReference` when
+`RuntimeIdentifier == browser-wasm`, so the link gets exactly one archive and one flag (verified in
+`emcc-link.rsp`, spike 0002, 4.1). Its archive is built from the same raylib release as the bindings, so the
+three undefined symbols of the old pairing (`DrawLineBezierCubic`, `DrawLineBezierQuad`, `GetSoundsPlaying`)
+are gone. The probe builds with **no** `WasmAllowUndefinedSymbols` and no warnings: a future mismatch becomes a
+build error instead of a runtime trap. Keep it that way.
 
-**Why not Raylib-cs 8.1.0 now?** 8.1.0 ships raylib 6.0 plus official `browser-wasm` support
-(`runtimes/browser-wasm/native/raylib.a` and a `buildTransitive` targets file that adds `-sUSE_GLFW=3` and the
-`NativeFileReference`). It is the better long-term answer, but it is a raylib 5.x -> 6.0 API change on top of an
-unproven Blazor path. Review decided to upgrade deliberately later: **M7**, with its own spike (0006).
+Consequences:
 
-Do not maintain both paths at once. The upgrade replaces `raylib.a`, the custom link flags and the ABI caveats
-in one step.
+- **Do not** commit a `raylib.a`, `libraylib.so` or `raylib.dll`, and do not add a second `NativeFileReference`.
+- **Do not** set `RuntimeIdentifier=browser-wasm` on `Rayforge.Core` or a game library; only the web host
+  needs it, and a game library that sets it drags the native reference into other builds.
+- The custom Emscripten flags from the old baseline are gone: `ALLOW_MEMORY_GROWTH` is on by default (heap
+  32 MB -> 70.8 MB on a 40 MB allocation), `FORCE_FILESYSTEM` is unnecessary (MEMFS exists), `TOTAL_MEMORY` is
+  obsolete, and `-DPLATFORM_WEB` is unnecessary because games branch on `Context.IsBrowser`, not on a define.
+
+Upgrades follow [UPGRADING-RAYLIB.md](UPGRADING-RAYLIB.md); the spike record is
+[spike 0002](spikes/0002-raylib-cs-8.1.0.md).
 
 
 ### 6.2 MSBuild properties
@@ -988,24 +1001,19 @@ The framework package (`Rayforge.Web/buildTransitive/Rayforge.Web.props`) sets o
 <Project>
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
     <WasmBuildNative>true</WasmBuildNative>
-    <WasmAllowUndefinedSymbols>true</WasmAllowUndefinedSymbols>
     <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
     <InvariantGlobalization>true</InvariantGlobalization>
 
     <!-- Temporary: -O2 makes the native link run wasm-opt with a flag Binaryen 117
-         does not know (spike 0001, section 4.3). Revisit in M5. -->
+         does not know (spike 0001, section 4.3; still true on 8.1.0, spike 0002,
+         section 4.4). Revisit in M5. -->
     <EmccLinkOptimizationFlag>-O0</EmccLinkOptimizationFlag>
-
-    <RayforgeInitialMemory Condition="'$(RayforgeInitialMemory)' == ''">64MB</RayforgeInitialMemory>
-    <EmccFlags>$(EmccFlags) -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sTOTAL_MEMORY=$(RayforgeInitialMemory) -DPLATFORM_WEB</EmccFlags>
   </PropertyGroup>
-
-  <!-- Linked once by the framework, so games never carry a native binary. -->
-  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
-    <NativeFileReference Include="$(MSBuildThisFileDirectory)..\raylib.a" />
-  </ItemGroup>
 </Project>
 ```
+
+No `NativeFileReference`, no `EmccFlags`, no `WasmAllowUndefinedSymbols`: Raylib-cs 8.1.0's own
+`buildTransitive` targets add the archive and `-sUSE_GLFW=3`, and a clean link is the ABI gate.
 
 Host (`HelloWorld.Web.csproj`):
 
@@ -1043,8 +1051,9 @@ Host (`HelloWorld.Web.csproj`):
 
 Notes, all confirmed or corrected by the M0 spike:
 
-- `EmccFlags` from the framework's props append cleanly before the SDK's own link flags (verified in the
-  generated `emcc-link.rsp`).
+- The package's link flags (`-sUSE_GLFW=3`) and its `NativeFileReference` flow through `buildTransitive`; the
+  framework props deliberately add **no** Emscripten flags (spike 0002, 4.1). Verify with
+  `grep -c raylib.a obj/Release/net10.0/wasm/for-publish/emcc-link.rsp` after any package change.
 - **`WasmFilesToIncludeInFileSystem` does not work with the Blazor SDK.** Assets are fetched at runtime and
   written into MEMFS instead (spike 0001, 4.1). `Assets.props` must therefore also emit the build-time asset
   list the host hands to `Rayforge.Web`.
@@ -1053,7 +1062,7 @@ Notes, all confirmed or corrected by the M0 spike:
 - `SelfContained=true` is harmless for Blazor WASM.
 - `RunAOTCompilation` is slow; keep it off until M5 has numbers.
 - Do **not** set `-sEXPORTED_RUNTIME_METHODS=ccall`; nothing calls into raylib from JS.
-- `-sUSE_GLFW=3` is provided here, once. Raylib-cs 7.0.2 does not add it (8.1.0 does).
+- `-sUSE_GLFW=3` is provided by the Raylib-cs package, once. Do not add it again.
 
 
 ### 6.3 RCL packaging
@@ -1076,7 +1085,7 @@ Notes, all confirmed or corrected by the M0 spike:
 - The JS receives the **assembly name** from C# (`typeof(RayforgeBridge).Assembly.GetName().Name`) instead
   of hardcoding it, and resolves both `Blazor.runtime` and `getDotnetRuntime(0)`.
 - The canvas ID is generated per component; JS never assumes `"canvas"`.
-- Package dependencies: `Raylib-cs [7.0.2, )`, `Microsoft.AspNetCore.Components.Web 10.0.x`.
+- Package dependencies: `Raylib-cs [8.1.0, )`, `Microsoft.AspNetCore.Components.Web 10.0.x`.
 - `buildTransitive` props ship in the package; they must resolve paths relative to the package root, not
   the repo. Include them explicitly:
 
@@ -1119,8 +1128,8 @@ Rayforge.Web.0.1.0-preview.1.nupkg
 - `<base href="./" />` in `index.html` makes sub-path hosting work. No router means no `404.html` fallback is
   strictly needed, but CI copies `index.html` to `404.html` anyway for future routes.
 - Add `.nojekyll` for GitHub Pages.
-- M0 reference numbers for the Hello-World-sized app: **6.2 MB raw / 1.9 MB brotli, 45 files, ~1.1 s to first
-  frame** on localhost without AOT. Use these as the baseline when checking regressions.
+- Reference numbers for the Hello-World-sized app (spike 0002): **6.04 MB raw / 1.85 MB brotli, 45 files,
+  ~1.1 s to first frame** on localhost without AOT. Use these as the baseline when checking regressions.
 
 ### 6.5 CI and deployment
 
@@ -1149,8 +1158,8 @@ workload caching until build times are known.
 |---|---|---|
 | .NET SDK | 10.0.4xx | `global.json`, `rollForward: latestFeature`; 10.0.402 verified |
 | Blazor WebAssembly | 10.0.x | standalone, no server project |
-| Raylib-cs | 7.0.2 | raylib 5.x bindings; upgrade to 8.1.0 is M7 |
-| raylib (native) | 5.6-dev, Emscripten/GLFW | vendored `raylib.a` (1.6 MB) in `Rayforge.Web` |
+| Raylib-cs | 8.1.0 | bindings for raylib 6.0; native archive ships in the package |
+| raylib (native) | 6.0, Emscripten/GLFW + desktop RIDs | `runtimes/<rid>/native/` in the Raylib-cs package; nothing vendored |
 | wasm-tools | 10.0.13 | `dotnet workload install wasm-tools` |
 | Emscripten | 3.1.56 (from wasm-tools) | do not mix with a system EMSDK on `PATH` |
 | Binaryen | 117 (from wasm-tools) | rejects `--enable-bulk-memory-opt`; see 4.3 in spike 0001 |
@@ -1208,7 +1217,7 @@ editor. It is a better "arbitrary game" test than a second hello world.
 
 Wolfrender is the large case (M6), not the first port. Known blockers:
 
-- Raylib-cs 7.0.2 -> 8.1.0 / raylib 6.0 API changes.
+- Raylib-cs 8.x / raylib 6.0 API changes (the base is already on 8.1.0; Wolfrender is not).
 - 5 MB of assets and a hardcoded preload list.
 - Custom pointer lock, frame pacing, debug console and `Game.Engine.*`/`Game.Core.*` namespaces.
 - Desktop ImGui editor and `rlImGui` (desktop only; should not be referenced by the web host).
@@ -1224,15 +1233,16 @@ The authoritative tracker, with per-milestone checklists, is [MILESTONES.md](MIL
 | Milestone | Deliverable | Exit criteria | Status |
 |---|---|---|---|
 | **M0 - Spike** | Throwaway Blazor app proving the decided stack. | Renders + audio + assets + letterboxed mouse mapping; DevServer and static publish work; findings written. | **Done 2026-10-21** |
+| **M0b - Upgrade probe** | M0 probe on Raylib-cs 8.1.0, package-provided native archive; upgrade workflow doc. | No undefined symbols; same behaviour; payload measured; `Raylib.props` and the vendored archive deleted. | **Done 2026-10-21** |
 | **M1 - Skeleton** | Solution, 3 framework projects, `IGame`/`GameContext`, host boots to a Razor loading screen, CI build. | `dotnet build` green; dependency rules documented; no game logic. | Next |
 | **M2 - Hello World** | Base canvas component, JS bridge, desktop runner, Hello World game + hosts, assets, audio, resize, error/loading overlays. | All Hello World acceptance criteria pass; same game on desktop and web. | Planned |
 | **M3 - Real port** | Preload/manifest assets, pointer lock/mouse look, diagnostics, DoomFire port. | DoomFire runs on web and desktop; porting guide validated; friction list written. | Planned |
 | **M4 - Template & packages** | `dotnet new rayforge-game`, packable `Rayforge.Core/Web/Desktop`, local feed, docs. | A new game can be created and run from the template without touching the base source. | Planned |
 | **M5 - CI & deploy** | GitHub Actions publish, Pages deploy, Playwright smoke test, size/time report, AOT measurement. | Green CI on a clean runner; deployed demo URL; smoke test catches a blank canvas. | Planned |
 | **M6 - Wolfrender port** (separate track) | Port Wolfrender onto Rayforge. | Playable in the browser; no Wolfrender-specific code in the base. | Planned |
-| **M7 - Raylib upgrade** | Raylib-cs 8.1.0 / raylib 6.0, drop the vendored `raylib.a`. | Base + Hello World green on 8.1.0, no regressions. | Planned |
 
-M0 closed the decision gate. M1 is the next action.
+M0 closed the decision gate; M0b settled the raylib baseline (8.1.0 / raylib 6.0) and absorbed the former M7.
+M1 is the next action.
 
 ---
 
@@ -1242,11 +1252,11 @@ M0 closed the decision gate. M1 is the next action.
 |---|---|---|---|
 | Release publish breaks on `wasm-opt --enable-bulk-memory-opt` (Binaryen 117) | **Certain today** | Medium | `EmccLinkOptimizationFlag=-O0` in the framework props; solve properly in M5 (workload update / SDK band / patched rsp). |
 | Asset build plumbing is fragile (`Link` -> 0-byte DevServer response) | High | Medium | Copy target before `ResolveStaticWebAssetsInputs` (spike 0001, 4.2); gitignore the generated folder; CI asserts a published asset is non-empty. |
-| ABI drift between Raylib-cs 7.0.2 and the 5.6-dev `raylib.a` | Medium | Medium | Document the three missing symbols; rebuild `raylib.a` from the matching commit if a port needs them; M7 removes the pairing. |
-| raylib 6.0 API changes make porting existing games expensive | High for Wolfrender | Medium | M7 after the base is stable; Wolfrender is M6; document the diff. |
+| A second native archive sneaks in (vendored `.a` or duplicate `NativeFileReference`) | Low | High (link failure or silent ABI trap) | Never commit a native binary; CI greps `emcc-link.rsp` for exactly one `raylib.a`; undefined symbols fail the build (spike 0002, 4.1/4.2). |
+| raylib 6.0 API changes make porting existing games expensive | High for Wolfrender | Medium | The base is already on 8.1.0; adapt Wolfrender in M6 and record the diff; DoomFire in M3 is the small rehearsal. |
 | `wasm-tools` / SDK / Emscripten mismatch | Medium | Medium | Pin SDK in `global.json`; CI installs the workload fresh; record the versions in `MILESTONES.md`. |
 | AOT build time/size is unacceptable | Medium | Medium | Interpreter by default; AOT measured in M5 before any policy change. |
-| Asset memory blow-up (MEMFS + decoded textures/audio) | Medium | Medium | Bundled only for small games; Preload groups for large ones; `ALLOW_MEMORY_GROWTH`; document limits. |
+| Asset memory blow-up (MEMFS + decoded textures/audio) | Medium | Medium | Bundled only for small games; Preload groups for large ones; memory growth is on by default but the initial 32 MB heap still bounds startup; measure at M3 (DoomFire) and M6 (5 MB of assets). |
 | Blazor render and game loop compete for the main thread | Low-Medium | Medium | No per-frame Blazor; overlays only; measure frame time with the diagnostics overlay. |
 | Pointer lock/audio/fullscreen gestures behave differently across browsers | Medium | Medium | Start overlay; test Chrome/Firefox/Safari; degrade gracefully; document unsupported features. |
 | HiDPI/mouse mapping bugs | Low now | Medium | Fit mode + `SetMouseScale` verified at 3 CSS scales and DPR 2; unit-test layout math; keep the manual matrix. |
@@ -1264,7 +1274,8 @@ These were decided in review on 2026-10-21, before M0:
 
 1. **Name:** Rayforge.
 2. **Structure:** Alternative A (layered monorepo), evolving into C (packages) at M4.
-3. **Raylib baseline:** stay on Raylib-cs 7.0.2 + vendored `raylib.a`; upgrade later (M7).
+3. **Raylib baseline:** Raylib-cs 8.1.0 / raylib 6.0 from the package; no vendored native, no custom props
+   (M0b, spike 0002).
 4. **Desktop parity in scope from day one:** yes.
 5. **Canvas mode:** both Fit and Fill, Fit by default.
 6. **Asset mode:** Bundled (semantics corrected by M0, see 5.7).
@@ -1282,14 +1293,14 @@ Still open (do not block M1):
 |---|---|
 | NuGet package IDs (`Rayforge.Core` etc.) - check availability before packing | M4 |
 | Default target browsers (Chrome + Firefox first, Safari best-effort; mobile out of scope?) | M2 |
-| Whether the three missing raylib entry points matter for real games, or `raylib.a` gets rebuilt | M1/M3 |
+| Whether the desktop RIDs other than `linux-x64` load their package natives (Windows, macOS x64/arm64) | M2/M5 |
 | Whether `dotnet workload update` fixes the Release `wasm-opt` failure | M5 |
 
 ---
 
 ## 12. References
 
-- Raylib-cs 8.1.0 (the M7 target): <https://github.com/raylib-cs/raylib-cs/releases/tag/v8.1.0>
+- Raylib-cs 8.1.0 (the baseline): <https://github.com/raylib-cs/raylib-cs/releases/tag/v8.1.0>
   - browser-wasm support, `runtimes/browser-wasm/native/raylib.a`, `buildTransitive/Raylib-cs.targets`
   - web example: `Examples/Web/{README.md,Host.cs,main.js,index.html,scaleUtils.js}`
 - Raylib 6.0: <https://github.com/raysan5/raylib/releases/tag/6.0>
@@ -1301,6 +1312,8 @@ Still open (do not block M1):
   `Components/Raylib.razor.cs`, `wwwroot/js/raylib.js`, `Raylib.props`
 - M0 evidence: [spikes/0001-raylib-cs-blazor-wasm.md](spikes/0001-raylib-cs-blazor-wasm.md),
   [`spike/m0-raylib-blazor/`](../spike/m0-raylib-blazor)
+- M0b evidence: [spikes/0002-raylib-cs-8.1.0.md](spikes/0002-raylib-cs-8.1.0.md),
+  [`spike/m0b-raylib-upgrade/`](../spike/m0b-raylib-upgrade), [UPGRADING-RAYLIB.md](UPGRADING-RAYLIB.md)
 
 ---
 
@@ -1308,11 +1321,12 @@ Still open (do not block M1):
 
 - [x] Name approved: Rayforge.
 - [x] Structure chosen: A (layered monorepo).
-- [x] Raylib baseline agreed: 7.0.2 + vendored `raylib.a`; 8.1.0 deferred to M7.
+- [x] Raylib baseline agreed: 8.1.0 / raylib 6.0 from the package; vendored `raylib.a` dropped (M0b).
 - [x] Desktop host in scope.
 - [x] Canvas mode (both, Fit default) and asset mode (Bundled) agreed.
 - [x] AOT policy agreed (later, measured in M5).
 - [x] License (MIT) and remote (`kenwi/Rayforge`, public) decided.
 - [x] M0 spike completed and accepted: GO.
+- [x] M0b upgrade probe completed and accepted: GO; M1 starts on Raylib-cs 8.1.0.
 - [ ] M1 skeleton approved as the next action.
 

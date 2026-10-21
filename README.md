@@ -25,7 +25,7 @@ game code (net10.0, Raylib-cs only)  ->  same game on desktop and in the browser
 | | |
 |---|---|
 | Runtime | .NET 10, Blazor WebAssembly (standalone) |
-| Renderer | raylib 5.6-dev via a vendored `raylib.a`, bound with Raylib-cs 7.0.2 (8.1.0 upgrade is M7) |
+| Renderer | raylib 6.0 via Raylib-cs 8.1.0; the native archive (browser + desktop RIDs) comes from the package |
 | Loop | `requestAnimationFrame` -> one synchronous `[JSExport]` per frame |
 | Canvas | Fit (fixed logical resolution + `SetMouseScale`) and Fill, both supported |
 | Assets | Fetched into the Emscripten MEMFS at boot (Blazor does not support `WasmFilesToIncludeInFileSystem`) |
@@ -37,7 +37,9 @@ game code (net10.0, Raylib-cs only)  ->  same game on desktop and in the browser
 | Document | Contents |
 |---|---|
 | [docs/PLAN.md](docs/PLAN.md) | Architecture, alternatives, build and packaging, risks, recorded decisions |
-| [docs/MILESTONES.md](docs/MILESTONES.md) | All milestones M0-M7 with checklists |
+| [docs/MILESTONES.md](docs/MILESTONES.md) | All milestones M0-M6 with checklists |
+| [docs/UPGRADING-RAYLIB.md](docs/UPGRADING-RAYLIB.md) | How to upgrade Raylib-cs / native raylib without a spike |
+| [docs/spikes/](docs/spikes/) | Spike records (0001 stack proof, 0002 raylib 8.1.0 upgrade) |
 | [docs/HELLO-WORLD.md](docs/HELLO-WORLD.md) | The first demo: behavior and acceptance criteria |
 | [docs/PORTING-GUIDE.md](docs/PORTING-GUIDE.md) | Checklist for bringing an existing Raylib-cs game to the web |
 | [docs/spikes/](docs/spikes/) | Time-boxed experiments and their results |

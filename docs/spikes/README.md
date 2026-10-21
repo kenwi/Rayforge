@@ -43,13 +43,13 @@ Proceed / change plan / fall back. What changes in PLAN.md?
 | ID | Question | Milestone | Result |
 |---|---|---|---|
 | [0001](0001-raylib-cs-blazor-wasm.md) | Does Raylib-cs 7.0.2 + a vendored `raylib.a` work inside a fresh Blazor WebAssembly app (canvas binding, native link, `[JSExport]` loop, assets, audio, resize)? | M0 | **GO**, with 4 plan corrections |
+| [0002](0002-raylib-cs-8.1.0.md) | Does Raylib-cs 8.1.0's official `browser-wasm` package replace the vendored `raylib.a` and `Raylib.props` cleanly (no undefined symbols, no regressions, smaller payload)? | M0b | **GO.** M1 starts on 8.1.0; raylib 6.0; 6.04 MB / 1.85 MB brotli; M7 closed |
 
 ## Planned spikes
 
 | ID | Question | Milestone |
 |---|---|---|
-| 0002 | Fit/Fill canvas math: correct mouse mapping at DPR 1/1.25/1.5/2 and browser zoom, in Chrome and Firefox? | M2 |
-| 0003 | Pointer lock + mouse delta under `Blazor.runtime.Module['canvas']`; does raylib's `DisableCursor` help at all? | M3 |
-| 0004 | Release publish: the `wasm-opt --enable-bulk-memory-opt` failure (see 0001 section 4.3) - workload update, SDK band, or patched response file? | M5 |
-| 0005 | AOT in Release: build time, payload size, runtime stability with the vendored raylib. | M5 |
-| 0006 | Raylib-cs 8.1.0 (raylib 6.0, official `browser-wasm` package) inside the Rayforge base: does it replace the vendored `raylib.a` cleanly? | M7 |
+| 0003 | Fit/Fill canvas math: correct mouse mapping at DPR 1/1.25/1.5/2 and browser zoom, in Chrome and Firefox? | M2 |
+| 0004 | Pointer lock + mouse delta under `Blazor.runtime.Module['canvas']`; does raylib's `DisableCursor` help at all? | M3 |
+| 0005 | Release publish: the `wasm-opt --enable-bulk-memory-opt` failure (see 0001 section 4.3) - workload update, SDK band, or patched response file? | M5 |
+| 0006 | AOT in Release: build time, payload size, runtime stability with the package's raylib archive. | M5 |

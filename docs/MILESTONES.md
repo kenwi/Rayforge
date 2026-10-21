@@ -10,15 +10,16 @@ Legend: `[x]` done, `[ ]` planned, **(blocked)** needs something external.
 | # | Milestone | Scope | Status |
 |---|---|---|---|
 | M0 | Spike | Prove Raylib-cs 7.0.2 + `raylib.a` in a fresh Blazor app | **Done** - 2026-10-21 |
+| M0b | Upgrade probe | Raylib-cs 8.1.0 / raylib 6.0 from the package; drop the vendored `raylib.a` | **Done** - 2026-10-21 |
 | M1 | Skeleton | Solution, framework projects, contracts, asset plumbing, CI build | Not started |
 | M2 | Hello World | Base canvas + JS bridge + desktop runner + demo game on both hosts | Not started |
 | M3 | First real port | DoomFire-Raylib on web and desktop; porting guide validated | Not started |
 | M4 | Template & packages | `dotnet new` template, packable framework, local feed | Not started |
 | M5 | CI & deploy | GitHub Actions, Pages deploy, Playwright smoke test, size report | Not started |
 | M6 | Wolfrender port | Separate track: port Wolfrender onto the base | Not started |
-| M7 | Raylib upgrade | Raylib-cs 8.1.0 / raylib 6.0, drop the vendored `raylib.a` if it holds | Not started |
 
-M0 was the decision gate and is closed. M1 is the next action.
+M0 was the decision gate and is closed; M0b settled the raylib baseline and removed the former M7. M1 is the
+next action.
 
 ---
 
@@ -45,6 +46,33 @@ M0 was the decision gate and is closed. M1 is the next action.
 **Closed:** 2026-10-21. **Verdict:** GO. Four plan corrections were folded into `PLAN.md` (asset mode semantics,
 asset copy target, Release `-O0` link workaround, absolute JS module URLs).
 
+The 7.0.2 + vendored `raylib.a` baseline recorded here was superseded by M0b the same day. The spike stays as
+the record of the technique; the project runs on Raylib-cs 8.1.0.
+
+---
+
+## M0b - Raylib 8.1.0 upgrade probe
+
+**Goal:** decide whether the official `browser-wasm` package replaces the vendored `raylib.a` before M1 bakes
+the old baseline into the skeleton.
+**Deliverable:** the M0 probe re-run on Raylib-cs 8.1.0, plus the repeatable upgrade procedure.
+**Result:** [spike 0002](spikes/0002-raylib-cs-8.1.0.md), code in
+[`spike/m0b-raylib-upgrade/`](../spike/m0b-raylib-upgrade).
+
+- [x] Link the package's `runtimes/browser-wasm/native/raylib.a`; no `Raylib.props`, no vendored archive
+- [x] Verify the response file contains exactly one `raylib.a` and one `-sUSE_GLFW=3`
+- [x] Build with **zero** undefined-symbol warnings (M0 had three) and without `WasmAllowUndefinedSymbols`
+- [x] Run 3D + 2D + texture + audio + Fit letterboxing + DPR 2 on 8.1.0
+- [x] Assert `IsTextureValid` / `IsSoundValid` in the probe (the helpers exist in both versions)
+- [x] Confirm the Release `wasm-opt` failure is toolchain-only and unaffected by the upgrade
+- [x] Prove the custom `ALLOW_MEMORY_GROWTH` / `FORCE_FILESYSTEM` / `TOTAL_MEMORY` flags are unnecessary
+- [x] Measure payload against the 7.0.2 baseline (6.04 MB vs 6.21 MB raw; 1.85 MB vs 1.88 MB brotli)
+- [x] Write [UPGRADING-RAYLIB.md](UPGRADING-RAYLIB.md) for the next upgrade
+- [ ] Desktop host on 8.1.0 (the package ships the natives; the host itself is M2)
+- [ ] Firefox and Safari **(blocked: only Chromium is installed here)**
+
+**Closed:** 2026-10-21. **Verdict:** GO. Rayforge pins Raylib-cs 8.1.0 / raylib 6.0 from M1 on; M7 is removed.
+
 ---
 
 ## M1 - Skeleton
@@ -62,15 +90,18 @@ boots to a Razor loading screen and fails gracefully.
 - [ ] `games/HelloWorld/HelloWorld.Web` + `HelloWorld.Desktop`: hosts that boot and show "loading"/"no game" states
 - [ ] Asset plumbing: `Assets.props` + the `wwwroot/assets` sync target from spike 0001, plus a build-generated
       asset list for the web host (no hand-maintained array)
-- [ ] Framework `buildTransitive/Rayforge.Web.props` with `WasmBuildNative`, `WasmAllowUndefinedSymbols`,
-      `EmccLinkOptimizationFlag=-O0` (documented as temporary), and the `NativeFileReference` for `raylib.a`
+- [ ] Framework `buildTransitive/Rayforge.Web.props` with `WasmBuildNative`, `EmccLinkOptimizationFlag=-O0`
+      (documented as temporary) and `InvariantGlobalization` - **no** raylib link flags, no
+      `NativeFileReference`, no `WasmAllowUndefinedSymbols` (the package supplies the native archive; see
+      spike 0002)
 - [ ] Architecture test: `.Game` references no Blazor/JS assembly; `Core` references no web assembly
 - [ ] `tests/Rayforge.Tests` project with the first unit tests for `CanvasLayout`
 - [ ] `.github/workflows/ci.yml`: restore, build, test (no deploy yet)
 - [ ] Document the dependency rules and the "one raylib context per page" rule
 
-**Notes:** `wwwroot/assets/` is generated output and stays gitignored. `raylib.a` lives once, in the framework
-project, not per game.
+**Notes:** `wwwroot/assets/` is generated output and stays gitignored. There is no `raylib.a` in the repo:
+`Raylib-cs 8.1.0` brings the native archive for every RID. Do not set `RuntimeIdentifier=browser-wasm` on
+`Rayforge.Core` or the game library, or the package's native reference may be requested outside the web host.
 
 ---
 
@@ -105,7 +136,7 @@ project, not per game.
 - [ ] Preload/manifest mode (groups + progress) if asset volume justifies it
 - [ ] Update `PORTING-GUIDE.md` with every real friction point
 - [ ] Confirm the "under ~50 lines of host-specific changes" expectation (or explain why not)
-- [ ] Pointer-lock spike (0003) if any input needs it; otherwise defer to M6
+- [ ] Pointer-lock spike (0004) if any input needs it; otherwise defer to M6
 
 ---
 
@@ -115,7 +146,8 @@ project, not per game.
 **Exit criteria:** `dotnet new rayforge-game` produces a project that builds and runs against packed packages.
 
 - [ ] `IsPackable=true` for `Rayforge.Core`, `Rayforge.Web`, `Rayforge.Desktop`; pack `buildTransitive` props,
-      `raylib.a`, README and LICENSE
+      README, LICENSE and `THIRD-PARTY-NOTICES` (raylib / Raylib-cs are Zlib) - no native binary, the Raylib-cs
+      dependency brings it
 - [ ] Versioning scheme (`0.x-preview.N`) and `Directory.Packages.props` wiring
 - [ ] Local NuGet feed for development (`nuget.config` + `dotnet nuget push` to a folder)
 - [ ] `templates/rayforge-game`: game library + web host + desktop host + assets + README
@@ -129,11 +161,11 @@ project, not per game.
 **Goal:** a green pipeline that publishes the demo and catches blank-canvas regressions.
 **Exit criteria:** clean-runner build + test + publish + deploy, with a smoke test that would fail on a black canvas.
 
-- [ ] Fix the Release `wasm-opt` failure (spike 0004) or make the workaround official
+- [ ] Fix the Release `wasm-opt` failure (spike 0005) or make the workaround official
 - [ ] `ci.yml`: setup-dotnet, `wasm-tools`, restore, build Release, test, publish, assert key output files
 - [ ] `deploy-hello-world.yml`: GitHub Pages, `.nojekyll`, `404.html`, sub-path safe `<base href="./">`
 - [ ] Playwright smoke test: page loads, canvas is non-blank, one frame advances, no console errors
-- [ ] AOT spike (0005): measure build time, payload, runtime; decide opt-in policy
+- [ ] AOT spike (0006): measure build time, payload, runtime; decide opt-in policy
 - [ ] Size/time report in CI (raw + brotli) with a regression threshold
 - [ ] Document the deploy recipe for any static host
 
@@ -146,25 +178,12 @@ project, not per game.
 
 - [ ] Split Wolfrender into a `Wolfrender.Game` library with no Blazor/JS references (still on its current raylib)
 - [ ] Desktop host against the new library
-- [ ] Raylib-cs upgrade if still required (or take it from M7)
+- [ ] Adapt Wolfrender to the 8.1.0 / raylib 6.0 API (the base baseline since M0b); record the diff
 - [ ] Replace `BrowserPointerLockBridge` / `GraphicsFramePacing` with `Context.MouseCapture` / host pacing
 - [ ] Assets: 5 MB set, manifests/groups, preload progress
 - [ ] Shaders: GLSL ES variants
 - [ ] Editor, ImGui and the highscore server excluded from the web build (decide their future)
 - [ ] Record the porting effort and update `PORTING-GUIDE.md`
-
----
-
-## M7 - Raylib upgrade
-
-**Goal:** move to Raylib-cs 8.1.0 / raylib 6.0 and delete the vendored `raylib.a` if the official package holds up.
-**Exit criteria:** base and Hello World green on 8.1.0, no regressions in the M2 acceptance criteria.
-
-- [ ] Spike 0006: 8.1.0 `browser-wasm` inside the Rayforge base (native link, `buildTransitive` flags, canvas)
-- [ ] Remove `raylib.a`, `Raylib.props` native bits and the ABI-drift workarounds if the package covers them
-- [ ] Adapt any API changes across `Rayforge.Core/Web/Desktop` and the sample games
-- [ ] Re-run the browser matrix and the publish-size measurements
-- [ ] Update the version matrix in `PLAN.md`
 
 ---
 
@@ -176,3 +195,5 @@ project, not per game.
 - Multi-game gallery/samples host (one game per page, not simultaneous)
 - Gamepad and touch input
 - Save data via browser storage / downloads
+- Keep raylib current: run [UPGRADING-RAYLIB.md](UPGRADING-RAYLIB.md) when a release fixes something we need
+  (not on a schedule)

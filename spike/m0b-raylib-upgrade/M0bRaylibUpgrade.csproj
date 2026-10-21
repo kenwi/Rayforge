@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <WasmGenerateAppBundle>true</WasmGenerateAppBundle>
+    <SelfContained>true</SelfContained>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>M0</RootNamespace>
+    <AssemblyName>M0bRaylibUpgrade</AssemblyName>
+    <!-- The spike is a probe, not a product: no AOT. -->
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.*" PrivateAssets="all" />
+    <PackageReference Include="Raylib-cs" Version="8.1.0" />
+  </ItemGroup>
+
+  <!-- Bundled assets: fetched into MEMFS by the host (Blazor ignores WasmFilesToIncludeInFileSystem). -->
+  <ItemGroup>
+    <GameAsset Include="Assets\**\*" />
+  </ItemGroup>
+
+  <!-- Static web assets map a Content item to the physical path implied by its Link, so the
+       files must exist under wwwroot/assets before the manifest is resolved. -->
+  <Target Name="SyncGameAssetsIntoWwwroot" BeforeTargets="ResolveStaticWebAssetsInputs">
+    <Copy SourceFiles="@(GameAsset)"
+          DestinationFiles="@(GameAsset->'$(MSBuildProjectDirectory)\wwwroot\assets\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Include="wwwroot\assets\**\*" Exclude="@(Content)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- No Raylib.props, no vendored raylib.a: Raylib-cs 8.1.0's buildTransitive targets add
+       -sUSE_GLFW=3 and the NativeFileReference for runtimes/browser-wasm/native/raylib.a. -->
+
+</Project>

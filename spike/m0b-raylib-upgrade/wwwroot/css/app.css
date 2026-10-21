@@ -1,0 +1,40 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #07080c;
+    color: #e6e8ef;
+    font-family: system-ui, sans-serif;
+}
+
+.stage {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: #07080c;
+}
+
+canvas {
+    display: block;
+    outline: none;
+    background: #0e1018;
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    gap: 1rem;
+    padding: 2rem;
+    background: #1a0f12ee;
+    z-index: 10;
+}
+
+.overlay pre {
+    max-width: 80ch;
+    white-space: pre-wrap;
+    font-size: 0.8rem;
+}
