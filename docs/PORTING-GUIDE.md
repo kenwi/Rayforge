@@ -40,6 +40,11 @@ games/<Name>/
 └── Assets/
 ```
 
+The csproj below shows the **in-repo** variant used by the sample games. For a game outside this repository,
+run `dotnet new rayforge-game` (M4) instead: it produces the same shape but references the packed
+`Rayforge.Core` and `Rayforge.Web`/`Rayforge.Desktop` packages, with no project references back to framework
+source.
+
 `<Name>.Game.csproj`:
 
 ```xml

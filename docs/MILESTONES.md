@@ -14,12 +14,13 @@ Legend: `[x]` done, `[ ]` planned, **(blocked)** needs something external.
 | M1 | Skeleton | Solution, framework projects, contracts, asset plumbing, CI build | **Done** - 2026-10-21 |
 | M2 | Hello World | Base canvas + JS bridge + desktop runner + demo game on both hosts | **Done** - 2026-10-21 |
 | M3 | First real port | DoomFire-Raylib on web and desktop; porting guide validated | **Done** - 2026-10-21 |
-| M4 | Template & packages | `dotnet new` template, packable framework, local feed | Not started |
+| M4 | Template & packages | `dotnet new` template, packable framework, local feed | **Done** - 2026-10-22 |
 | M5 | CI & deploy | GitHub Actions, Pages deploy, Playwright smoke test, size report | Not started |
 | M6 | Wolfrender port | Separate track: port Wolfrender onto the base | Not started |
 
 M0 was the decision gate and is closed; M0b settled the raylib baseline and removed the former M7. M1 built the
-skeleton; M2 delivered Hello World; M3 validated the porting guide on DoomFire. M4 is the next action.
+skeleton; M2 delivered Hello World; M3 validated the porting guide on DoomFire; M4 made the framework
+packable and added the game template. M5 is the next action.
 
 ---
 
@@ -90,7 +91,7 @@ boots to a Razor loading screen and fails gracefully.
 - [x] `games/HelloWorld/HelloWorld.Web` + `HelloWorld.Desktop`: hosts that boot and show "loading"/"no game" states
 - [x] Asset plumbing: `Assets.props` + the `wwwroot/assets` sync target from spike 0001, plus a build-generated
       asset list for the web host (no hand-maintained array)
-- [x] Framework `buildTransitive/Rayforge.Web.props` with `WasmBuildNative`, `EmccLinkOptimizationFlag=-O0`
+- [x] Framework `buildTransitive/Rayforge.Web.targets` with `WasmBuildNative`, `EmccLinkOptimizationFlag=-O0`
       (documented as temporary) and `InvariantGlobalization` - **no** raylib link flags, no
       `NativeFileReference`, no `WasmAllowUndefinedSymbols` (the package supplies the native archive; see
       spike 0002)
@@ -206,14 +207,45 @@ future Raylib-cs package switches.
 **Goal:** a new game can be created without touching the framework source.
 **Exit criteria:** `dotnet new rayforge-game` produces a project that builds and runs against packed packages.
 
-- [ ] `IsPackable=true` for `Rayforge.Core`, `Rayforge.Web`, `Rayforge.Desktop`; pack `buildTransitive` props,
-      README, LICENSE and `THIRD-PARTY-NOTICES` (raylib / Raylib-cs are Zlib) - no native binary, the Raylib-cs
-      dependency brings it
-- [ ] Versioning scheme (`0.x-preview.N`) and `Directory.Packages.props` wiring
-- [ ] Local NuGet feed for development (`nuget.config` + `dotnet nuget push` to a folder)
-- [ ] `templates/rayforge-game`: game library + web host + desktop host + assets + README
-- [ ] Template tests: create in a temp dir, build both hosts
-- [ ] Framework README: install, first game, deployment
+- [x] `IsPackable=true` for `Rayforge.Core`, `Rayforge.Web`, `Rayforge.Desktop`; pack `buildTransitive`
+      targets, README, LICENSE and `THIRD-PARTY-NOTICES` (raylib / Raylib-cs are Zlib) - no native binary, the
+      Raylib-cs dependency brings it
+- [x] Versioning scheme (`0.x-preview.N`) and `Directory.Packages.props` wiring
+- [x] Local NuGet feed for development (`NuGet.config` + `dotnet nuget push` to a folder)
+- [x] `templates/rayforge-game`: game library + web host + desktop host + assets + README
+- [x] Template tests: create in a temp dir, build both hosts
+- [x] Framework README: install, first game, deployment
+- [x] UI decision record (`docs/UI-STRATEGY.md`, no ImGui dependency)
+
+**Notes:** `RayforgeVersion` in `Directory.Build.props` is the single version source; the pack targets reject
+anything that is not `0.x.y-preview.N`. The nupkgs are built into `artifacts/packages` and pushed into
+`nuget-local/` by `scripts/pack.sh`. `Rayforge.Core`/`Desktop` have no package content beyond their assembly
+and the shared README/LICENSE/notices; `Rayforge.Web` also carries `rayforge.js`, scoped CSS, static web assets
+and `buildTransitive/Rayforge.Web.targets`.
+
+The wasm flags are a `.targets`, not a `.props`, because the Razor SDK already generates
+`buildTransitive/Rayforge.Web.props` for static web assets and NuGet imports both conventions. The template
+pins `RayforgeVersion` and `RayforgeFeed` as `dotnet new` options and has no `ProjectReference` to framework
+source. Packages declare their dependencies on `Raylib-cs`/`Rayforge.Core`; no native `raylib.a` is packed.
+
+**Result:** `./scripts/pack.sh` produces `Rayforge.Core`, `Rayforge.Web` and `Rayforge.Desktop`
+`0.1.0-preview.1`; each nupkg contains `README.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`, and no
+`runtimes/` or native archive. [`tests/template-smoke.sh`](../tests/template-smoke.sh) packs into a throwaway
+feed, installs the template, generates `TemplateGame`, restores from the feed, builds the desktop and web
+hosts, checks `-O0` plus the Raylib-cs `raylib.a` link, and publishes `wwwroot` with the real asset bytes.
+The generated app also ran: headless Chromium loaded 1280x720 Fit, preloaded 1 asset (`motd.txt`), started the
+loop with no console/page errors; the desktop host opened 1280x720 and logged `ExampleGame ready
+(browser=False)`.
+
+`docs/UI-STRATEGY.md` records the ImGui probe (works with `ImGui.NET.SourceBuild`, but no renderer/input
+backend, variadic WASM trap, +~2.31 MB raw at `-O0`) and keeps ImGui out of v1.
+
+**Open:** packages are not published to nuget.org; the template defaults to `../nuget-local` and docs say how
+to point it elsewhere. Package IDs were checked free on nuget.org on 2026-10-22 but are not reserved. Firefox
+and Safari remain unverified (only Chromium installed). M5 still owns CI, deploy, Playwright and the `-O2`
+link fix.
+
+**Closed:** 2026-10-22.
 
 ---
 

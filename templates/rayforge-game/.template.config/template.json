@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Kenneth Wilhelmsen",
+  "classifications": [
+    "Raylib",
+    "Blazor",
+    "Game",
+    "WebAssembly"
+  ],
+  "identity": "Rayforge.Game.Template",
+  "name": "Rayforge Game",
+  "shortName": "rayforge-game",
+  "description": "A portable Raylib-cs game with a Blazor WebAssembly host and a desktop host.",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "RayforgeGame",
+  "preferNameDirectory": true,
+  "symbols": {
+    "RayforgeVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "0.1.0-preview.1",
+      "replaces": "__RAYFORGE_VERSION__",
+      "description": "Rayforge package version to reference."
+    },
+    "RayforgeFeed": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "../nuget-local",
+      "replaces": "__RAYFORGE_FEED__",
+      "description": "Folder feed containing the Rayforge packages (or a NuGet feed URL)."
+    }
+  }
+}

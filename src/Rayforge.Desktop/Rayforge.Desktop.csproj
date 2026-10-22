@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <RootNamespace>Rayforge.Desktop</RootNamespace>
+    <PackageId>Rayforge.Desktop</PackageId>
     <IsPackable>true</IsPackable>
     <Description>Desktop host for Rayforge games (raylib window, cursor capture, frame loop).</Description>
   </PropertyGroup>

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="RayforgeGame.Game/RayforgeGame.Game.csproj" />
+  <Project Path="RayforgeGame.Web/RayforgeGame.Web.csproj" />
+  <Project Path="RayforgeGame.Desktop/RayforgeGame.Desktop.csproj" />
+</Solution>

@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <RootNamespace>Rayforge.Web</RootNamespace>
+    <PackageId>Rayforge.Web</PackageId>
     <IsPackable>true</IsPackable>
     <!-- Required by [JSImport] (SYSLIB1074). -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -22,7 +23,9 @@
   </ItemGroup>
 
   <!-- Shipped to consumers as buildTransitive (M4). In this repo Directory.Build.targets imports the
-       same file for any project built with RuntimeIdentifier=browser-wasm. -->
+       same file for any project built with RuntimeIdentifier=browser-wasm. It is a .targets (not
+       .props) because the Razor SDK already generates buildTransitive/Rayforge.Web.props for static
+       web assets; NuGet imports both conventions, so the wasm flags need a different file name. -->
   <ItemGroup>
     <None Include="buildTransitive\**\*" Pack="true" PackagePath="buildTransitive\" />
   </ItemGroup>

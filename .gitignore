@@ -8,6 +8,10 @@ publish/
 .vs/
 .idea/
 
+# Local NuGet feed (scripts/pack.sh): keep the folder, not the packages.
+nuget-local/*.nupkg
+nuget-local/*.snupkg
+
 # Test / tool output
 TestResults/
 playwright-report/

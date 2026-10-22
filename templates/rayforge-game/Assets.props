@@ -1,0 +1,78 @@
+<Project>
+
+  <!-- Asset plumbing for this game's two hosts.
+
+       Assets live once, in Assets/. Both hosts import this file:
+         Web     -> copied into wwwroot/assets before static web assets are resolved, so the dev
+                    server and publish serve real bytes.
+         Desktop -> copied next to the executable, loaded with raylib's normal relative paths.
+
+       The web host also gets assets/rayforge.assets.json, generated at build time. RayforgeCanvas
+       fetches exactly that list into MEMFS before the game starts; never hand-maintain an array. -->
+
+  <PropertyGroup>
+    <RayforgeAssetsDir>$(MSBuildThisFileDirectory)Assets/</RayforgeAssetsDir>
+    <RayforgeAssetMode Condition="'$(RayforgeAssetMode)' == ''">Bundled</RayforgeAssetMode>
+    <RayforgeAssetManifestName>rayforge.assets.json</RayforgeAssetManifestName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <RayforgeAsset Include="$(RayforgeAssetsDir)**/*"
+                   Exclude="$(RayforgeAssetsDir)**/*.md;$(RayforgeAssetsDir)**/licenses/**" />
+    <RayforgeAssetPath Include="@(RayforgeAsset->'assets/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </ItemGroup>
+
+  <!-- Desktop: flat copy next to the app, preserving subfolders. -->
+  <ItemGroup Condition="'$(RayforgeHost)' == 'Desktop'">
+    <Content Include="@(RayforgeAsset)"
+             Link="assets/%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Web: physical copy into wwwroot plus the generated manifest. -->
+  <Target Name="RayforgeSyncWebAssets"
+          Condition="'$(RayforgeHost)' == 'Web'"
+          BeforeTargets="ResolveStaticWebAssetsInputs">
+
+    <PropertyGroup>
+      <_RayforgeWebAssetsDir>$(MSBuildProjectDirectory)/wwwroot/assets/</_RayforgeWebAssetsDir>
+    </PropertyGroup>
+
+    <!-- Generated output: wipe it so removed assets cannot leak into a publish. -->
+    <RemoveDir Directories="$(_RayforgeWebAssetsDir)" />
+    <MakeDir Directories="$(_RayforgeWebAssetsDir)" />
+
+    <Copy SourceFiles="@(RayforgeAsset)"
+          DestinationFiles="@(RayforgeAsset->'$(_RayforgeWebAssetsDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+
+    <PropertyGroup>
+      <_RayforgeAssetJson>@(RayforgeAssetPath->'&quot;%(Identity)&quot;', ',')</_RayforgeAssetJson>
+      <_RayforgeAssetJson>$(_RayforgeAssetJson.Replace('\', '/'))</_RayforgeAssetJson>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_RayforgeManifestLine Include="[" />
+      <_RayforgeManifestLine Include="  $(_RayforgeAssetJson)" />
+      <_RayforgeManifestLine Include="]" />
+    </ItemGroup>
+
+    <WriteLinesToFile File="$(_RayforgeWebAssetsDir)$(RayforgeAssetManifestName)"
+                      Lines="@(_RayforgeManifestLine)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+
+    <ItemGroup>
+      <Content Include="wwwroot/assets/**/*" Exclude="@(Content)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- The hosts must declare their kind (and a valid mode) before importing this file. -->
+  <Target Name="RayforgeValidateHost" BeforeTargets="Build">
+    <Error Condition="'$(RayforgeHost)' != 'Web' And '$(RayforgeHost)' != 'Desktop'"
+           Text="Set &lt;RayforgeHost&gt; to Web or Desktop before importing Assets.props." />
+    <Error Condition="'$(RayforgeAssetMode)' != 'Bundled' And '$(RayforgeAssetMode)' != 'Preload'"
+           Text="RayforgeAssetMode must be Bundled or Preload (got '$(RayforgeAssetMode)')." />
+  </Target>
+
+</Project>

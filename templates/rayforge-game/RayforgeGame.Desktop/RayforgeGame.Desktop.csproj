@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>RayforgeGame.Desktop</RootNamespace>
+    <AssemblyName>RayforgeGame.Desktop</AssemblyName>
+    <RayforgeHost>Desktop</RayforgeHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rayforge.Desktop" />
+    <ProjectReference Include="..\RayforgeGame.Game\RayforgeGame.Game.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\Assets.props" />
+
+</Project>

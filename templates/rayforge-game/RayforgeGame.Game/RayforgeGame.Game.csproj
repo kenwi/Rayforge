@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>RayforgeGame</RootNamespace>
+    <AssemblyName>RayforgeGame.Game</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rayforge.Core" />
+    <PackageReference Include="Raylib-cs" />
+  </ItemGroup>
+
+</Project>

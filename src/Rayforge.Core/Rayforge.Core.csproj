@@ -3,6 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Rayforge</RootNamespace>
     <AssemblyName>Rayforge.Core</AssemblyName>
+    <PackageId>Rayforge.Core</PackageId>
     <IsPackable>true</IsPackable>
     <Description>Platform-neutral contracts for Rayforge games (no Blazor, no JavaScript interop).</Description>
   </PropertyGroup>

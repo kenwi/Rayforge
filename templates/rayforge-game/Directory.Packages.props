@@ -1,0 +1,17 @@
+<Project>
+
+  <ItemGroup>
+    <!-- The version placeholder is filled by the template's RayforgeVersion option. -->
+    <PackageVersion Include="Rayforge.Core" Version="__RAYFORGE_VERSION__" />
+    <PackageVersion Include="Rayforge.Web" Version="__RAYFORGE_VERSION__" />
+    <PackageVersion Include="Rayforge.Desktop" Version="__RAYFORGE_VERSION__" />
+
+    <!-- Must match the Raylib-cs baseline used by Rayforge.Core and the native archive. -->
+    <PackageVersion Include="Raylib-cs" Version="8.1.0" />
+
+    <!-- Blazor WebAssembly host. -->
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.13" />
+  </ItemGroup>
+
+</Project>

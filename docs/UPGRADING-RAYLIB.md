@@ -15,7 +15,7 @@ what actually bit us. Read that after the steps, not before.
 |---|---|---|
 | `Raylib-cs` version | `Directory.Packages.props` (`PackageVersion`) | Pin it in a game's `.csproj` or in two places |
 | Native raylib | comes from the package (`runtimes/<rid>/native/`) | Commit a `raylib.a`, `libraylib.so` or `.dll` into the repo |
-| Emscripten link flags | `Rayforge.Web/buildTransitive/Rayforge.Web.props` | Add `-sUSE_GLFW=3` yourself (the package does) |
+| Emscripten link flags | `Rayforge.Web/buildTransitive/Rayforge.Web.targets` | Add `-sUSE_GLFW=3` yourself (the package does) |
 | Docs that name the version | `PLAN.md` 6.6, `PORTING-GUIDE.md` compatibility table, `HELLO-WORLD.md` baseline, `MILESTONES.md` | Let a doc keep the old version "for history" - history lives in the spike record |
 
 If any of those disagree after an upgrade, the upgrade is not finished.
@@ -98,7 +98,7 @@ to hide it behind a compat shim.
 
 ## 6. Reconcile the props file
 
-Read `buildTransitive/Raylib-cs.targets` and compare it with `Rayforge.Web.props`. For each flag we set, decide
+Read `buildTransitive/Raylib-cs.targets` and compare it with `Rayforge.Web.targets`. For each flag we set, decide
 **keep / delete / let the package do it**:
 
 | Ours | Verdict rule |

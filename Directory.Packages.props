@@ -1,6 +1,13 @@
 <Project>
 
   <ItemGroup>
+    <!-- The framework's own packages. They are not referenced in this repo (games use project
+         references for a fast inner loop), but the versions are declared here so a future
+         package-reference consumer or a sample gets the same number as the pack output. -->
+    <PackageVersion Include="Rayforge.Core" Version="$(RayforgeVersion)" />
+    <PackageVersion Include="Rayforge.Web" Version="$(RayforgeVersion)" />
+    <PackageVersion Include="Rayforge.Desktop" Version="$(RayforgeVersion)" />
+
     <!-- Raylib-cs 8.1.0 is the single raylib pin: managed bindings, the browser-wasm native
          archive and the desktop RID natives all come from it. See docs/UPGRADING-RAYLIB.md. -->
     <PackageVersion Include="Raylib-cs" Version="8.1.0" />

@@ -1,9 +1,35 @@
 <Project>
 
+  <!-- Files every Rayforge package carries. The package README is intentionally separate from the repo
+       README: NuGet readers need install/deployment steps, not the milestone history. -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(RayforgeRepoRoot)docs/PACKAGE-README.md"
+          Pack="true"
+          PackagePath="README.md"
+          Visible="false" />
+    <None Include="$(RayforgeRepoRoot)LICENSE"
+          Pack="true"
+          PackagePath=""
+          Visible="false" />
+    <None Include="$(RayforgeRepoRoot)THIRD-PARTY-NOTICES.md"
+          Pack="true"
+          PackagePath=""
+          Visible="false" />
+  </ItemGroup>
+
+  <!-- Preview numbering is deliberate. A stable-looking 0.2.0 on the local feed would hide that the API is
+       still allowed to move; bump the preview number for every packed change. -->
+  <Target Name="RayforgeValidatePackageVersion"
+          BeforeTargets="Pack"
+          Condition="'$(IsPackable)' == 'true'">
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(RayforgeVersion)', '^0\.[0-9]+\.[0-9]+-preview\.[0-9]+$'))"
+           Text="RayforgeVersion must look like 0.1.0-preview.1 (got '$(RayforgeVersion)')." />
+  </Target>
+
   <!-- In-repo convenience: a project built for browser-wasm gets the same flags the NuGet package
        ships through buildTransitive (M4). One file, two entry points - never duplicate the flags.
        Directory.Build.targets sees RuntimeIdentifier, Directory.Build.props would not. -->
-  <Import Project="$(RayforgeRepoRoot)src/Rayforge.Web/buildTransitive/Rayforge.Web.props"
-          Condition="'$(RuntimeIdentifier)' == 'browser-wasm' And Exists('$(RayforgeRepoRoot)src/Rayforge.Web/buildTransitive/Rayforge.Web.props')" />
+  <Import Project="$(RayforgeRepoRoot)src/Rayforge.Web/buildTransitive/Rayforge.Web.targets"
+          Condition="'$(RuntimeIdentifier)' == 'browser-wasm' And Exists('$(RayforgeRepoRoot)src/Rayforge.Web/buildTransitive/Rayforge.Web.targets')" />
 
 </Project>

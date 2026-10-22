@@ -1,0 +1,86 @@
+:root {
+    color-scheme: dark;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #0a0a10;
+    color: #e9e9f2;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.boot-splash {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #8b8ba4;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+}
+
+.fatal {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: #0a0a10;
+}
+
+.fatal-panel {
+    max-width: min(760px, 100%);
+    max-height: 80vh;
+    overflow: auto;
+    padding: 28px 32px;
+    border: 1px solid #7a2b37;
+    border-radius: 14px;
+    background: #131019;
+}
+
+.fatal-panel h1 {
+    margin: 0 0 14px;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.fatal-panel pre {
+    margin: 0 0 18px;
+    color: #ffb3bf;
+    font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.fatal-panel a {
+    color: #9fb0ff;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    inset: auto 0 0 0;
+    padding: 12px 18px;
+    background: #2a1420;
+    color: #ffb3bf;
+    font-size: 13px;
+    text-align: center;
+    z-index: 1000;
+}
+
+#blazor-error-ui .reload,
+#blazor-error-ui .dismiss {
+    color: #ffd7dd;
+    margin-left: 12px;
+    cursor: pointer;
+}
+
+#blazor-error-ui .dismiss {
+    float: right;
+}

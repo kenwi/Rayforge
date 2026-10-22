@@ -11,7 +11,28 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
 
     <RayforgeRepoRoot>$(MSBuildThisFileDirectory)</RayforgeRepoRoot>
+
+    <!-- One version for every Rayforge package. The template's Directory.Packages.props consumes the
+         same value, so a game and the framework it was generated against cannot drift by accident.
+         Scheme: 0.<minor>.<patch>-preview.<n> until the API is stable. -->
     <RayforgeVersion>0.1.0-preview.1</RayforgeVersion>
+    <Version>$(RayforgeVersion)</Version>
+    <PackageVersion>$(RayforgeVersion)</PackageVersion>
+
+    <!-- Only the framework projects opt in; game hosts and samples must never be packed. -->
+    <IsPackable>false</IsPackable>
+
+    <Authors>Kenneth Wilhelmsen</Authors>
+    <Company>Rayforge</Company>
+    <Copyright>Copyright (c) 2026 Kenneth Wilhelmsen</Copyright>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/kenwi/Rayforge</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/kenwi/Rayforge</PackageProjectUrl>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageTags>raylib;blazor;wasm;webassembly;game</PackageTags>
+    <PackageOutputPath>$(RayforgeRepoRoot)artifacts/packages</PackageOutputPath>
   </PropertyGroup>
 
 </Project>
