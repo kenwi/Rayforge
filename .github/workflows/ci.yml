@@ -47,8 +47,11 @@ jobs:
         run: |
           set -euo pipefail
           test -s artifacts/hello-world/wwwroot/assets/logo.png
-          test -s artifacts/hello-world/wwwroot/assets/blip.wav
+          test -s artifacts/hello-world/wwwroot/assets/blip.ogg
+          test -s artifacts/hello-world/wwwroot/assets/ui.ttf
           test -f artifacts/hello-world/wwwroot/assets/rayforge.assets.json
           grep -q 'assets/logo.png' artifacts/hello-world/wwwroot/assets/rayforge.assets.json
+          grep -q 'assets/blip.ogg' artifacts/hello-world/wwwroot/assets/rayforge.assets.json
+          grep -q 'assets/ui.ttf' artifacts/hello-world/wwwroot/assets/rayforge.assets.json
           ls artifacts/hello-world/wwwroot/_framework/dotnet.native.*.wasm
           echo "web artifact OK"
