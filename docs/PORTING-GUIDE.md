@@ -343,7 +343,7 @@ that gets its own commit and its own checklist ([UPGRADING-RAYLIB.md](UPGRADING-
 |---|---|---|
 | `Cannot find native library 'raylib'` / unresolved symbol | RID not `browser-wasm`, `WasmBuildNative` false, or the Raylib-cs package reference is missing | Set `RuntimeIdentifier=browser-wasm` on the **web host**, `WasmBuildNative=true`; reference `Raylib-cs` (it supplies the archive); check `obj/.../wasm/for-build/*.rsp` |
 | `undefined symbol: ...` at link time | A native archive that does not match the Raylib-cs bindings (typically a vendored `raylib.a`) | Delete the extra archive / `NativeFileReference`; use the package's `runtimes/browser-wasm/native/raylib.a`; do not set `WasmAllowUndefinedSymbols` |
-| `wasm-opt: Unknown option '--enable-bulk-memory-opt'` | Release link with Binaryen 117 (spike 0001, 4.3) | `EmccLinkOptimizationFlag=-O0` (temporary); try `dotnet workload update`; remove system EMSDK from `PATH` |
+| `wasm-opt: Unknown option '--enable-bulk-memory-opt'` | Release link with Binaryen 117 (spike 0005) | `EmccLinkOptimizationFlag=-O0` is the official default; do not chase it unless your workload ships a newer Binaryen |
 | Black canvas, no errors | Canvas not bound before `InitWindow`, or `Module.canvas` is the wrong module | Bind via `Blazor.runtime.Module['canvas']` in `OnAfterRenderAsync`; verify `canvas.id` |
 | Black canvas after hot reload | raylib window already initialized | Disable hot reload; full page reload; guard second init |
 | `GET /_framework/js/...` 404 / dynamic import fails | `JSHost.ImportAsync` resolves relative URLs against `_framework/` | Pass an absolute URL built from `NavigationManager.BaseUri` |

@@ -15,7 +15,7 @@
     <!-- One version for every Rayforge package. The template's Directory.Packages.props consumes the
          same value, so a game and the framework it was generated against cannot drift by accident.
          Scheme: 0.<minor>.<patch>-preview.<n> until the API is stable. -->
-    <RayforgeVersion>0.1.0-preview.1</RayforgeVersion>
+    <RayforgeVersion>0.1.0-preview.2</RayforgeVersion>
     <Version>$(RayforgeVersion)</Version>
     <PackageVersion>$(RayforgeVersion)</PackageVersion>
 

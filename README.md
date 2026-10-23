@@ -3,10 +3,14 @@
 A small framework for running C# / [Raylib](https://raylib.com) games in the browser with Blazor WebAssembly,
 while keeping the game code itself portable to desktop.
 
-> **Status: M4 done (template and packages).** The same `net10.0` game library runs in the browser and in a
+[![ci](https://github.com/kenwi/Rayforge/actions/workflows/ci.yml/badge.svg)](https://github.com/kenwi/Rayforge/actions/workflows/ci.yml)
+
+> **Status: M5 done (CI and deployment).** The same `net10.0` game library runs in the browser and in a
 > native window. `dotnet new rayforge-game` consumes packed `Rayforge.Core`, `Rayforge.Web` and
-> `Rayforge.Desktop` packages, with no project reference back into the framework. Hello World and DoomFire
-> remain the in-repo demos. Roadmap and checklists: [docs/MILESTONES.md](docs/MILESTONES.md).
+> `Rayforge.Desktop` packages, with no project reference back into the framework. CI builds, tests,
+> publishes, checks the payload budget and runs a Playwright smoke test before deploying the demo to
+> GitHub Pages. Hello World and DoomFire remain the in-repo demos. Roadmap and checklists:
+> [docs/MILESTONES.md](docs/MILESTONES.md).
 
 ## Why
 
@@ -56,7 +60,12 @@ dotnet publish MyGame.Web -c Release -o artifacts/my-game
 
 Serve `artifacts/my-game/wwwroot` with any static server that sends `application/wasm`, including under a
 sub-path. The generated `<base href="./" />` and the framework's `buildTransitive` wasm flags are already in
-place. The current Release link uses `-O0` (Binaryen 117 workaround, owned by M5); do not override it by hand.
+place. The Release link uses `-O0` officially: the current .NET 10 Emscripten pack pairs with Binaryen 117,
+which rejects a flag used by `-O2` ([spike 0005](docs/spikes/0005-release-wasm-opt.md)). Do not override it
+by hand.
+
+The GitHub Pages pipeline, the exact static-host requirements, AOT opt-in and troubleshooting are in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The demo is deployed at <https://kenwi.github.io/Rayforge/>.
 
 ## Work on the framework
 
@@ -68,6 +77,8 @@ dotnet run --project games/HelloWorld/HelloWorld.Desktop
 dotnet run --project games/DoomFire/DoomFire.Web
 dotnet run --project games/DoomFire/DoomFire.Desktop
 ./tests/template-smoke.sh                               # pack -> template -> build both hosts -> publish
+./tests/check-web-size.sh                               # payload budget for a local publish
+(cd tests/web-smoke && npm ci && npx playwright install --with-deps chromium && npx playwright test)
 ```
 
 The in-repo games use project references for a fast inner loop. The packages and template use the local feed,
@@ -84,7 +95,7 @@ are part of every `.nupkg`; no native raylib binary is packed. Raylib-cs supplie
 | Canvas | Fit (fixed logical resolution + `SetMouseScale`) and Fill, both supported |
 | Assets | Fetched into the Emscripten MEMFS at boot (Blazor does not support `WasmFilesToIncludeInFileSystem`) |
 | Shape | `src/Rayforge.{Core,Web,Desktop}` + `games/<Game>/{.Game,.Web,.Desktop}` + `templates/rayforge-game` |
-| Packages | `Rayforge.*` `0.1.0-preview.1`; local folder feed in `nuget-local/`; Raylib-cs stays a dependency |
+| Packages | `Rayforge.*` `0.1.0-preview.2`; local folder feed in `nuget-local/`; Raylib-cs stays a dependency |
 | UI | Game-owned / raylib-drawn; Dear ImGui is not a framework dependency ([docs/UI-STRATEGY.md](docs/UI-STRATEGY.md)) |
 | License | MIT |
 
@@ -95,6 +106,7 @@ are part of every `.nupkg`; no native raylib binary is packed. Raylib-cs supplie
 | [docs/PLAN.md](docs/PLAN.md) | Architecture, alternatives, build and packaging, risks, recorded decisions |
 | [docs/MILESTONES.md](docs/MILESTONES.md) | All milestones M0-M6 with checklists |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Project graph, dependency rules, one-context rule, boot sequences, asset pipeline |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | GitHub Pages pipeline, browser smoke test, payload budget, static-host recipe |
 | [docs/PACKAGE-README.md](docs/PACKAGE-README.md) | The README shipped inside each NuGet package |
 | [docs/UI-STRATEGY.md](docs/UI-STRATEGY.md) | ImGui investigation and the UI decision record |
 | [docs/UPGRADING-RAYLIB.md](docs/UPGRADING-RAYLIB.md) | How to upgrade Raylib-cs / native raylib without a spike |

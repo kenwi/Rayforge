@@ -144,8 +144,11 @@ The web target wipes `wwwroot/assets/` before copying: it is generated, gitignor
 `src/Rayforge.Web/buildTransitive/Rayforge.Web.targets` is the single source of truth:
 
 - `WasmBuildNative`, `WasmEnableExceptionHandling`, `InvariantGlobalization`;
-- `EmccLinkOptimizationFlag=-O0` when unset — **temporary**, see spike 0001 4.3 / spike 0002 4.4 (Binaryen 117
-  rejects a flag used by `-O2`); owned by M5;
+- `EmccLinkOptimizationFlag=-O0` when unset — **the official Release setting**, because Binaryen 117 in the
+  current .NET 10 Emscripten pack rejects a flag used by `-O2` ([spike 0005](spikes/0005-release-wasm-opt.md));
+- an AOT-only target that keeps Raylib-cs interpreted (`AOT_InternalForceToInterpret`), because
+  `mono-aot-cross` crashes on the generated bindings ([spike 0006](spikes/0006-aot.md)); AOT itself stays
+  opt-in via `-p:RunAOTCompilation=true`;
 - nothing raylib-specific: the Raylib-cs package supplies `raylib.a`, `-sUSE_GLFW=3` and the RID natives.
 
 In this repo `Directory.Build.targets` imports that file when `RuntimeIdentifier == browser-wasm`
@@ -188,6 +191,18 @@ dotnet build MyGame/MyGame.slnx -c Release
 `rayforge-local` folder source. `tests/template-smoke.sh` repeats the consumer flow from a clean temporary
 directory, builds both hosts, checks the nupkg contents, and publishes the web host.
 
+## CI and deployment (M5)
+
+The pipeline is `build -> smoke -> deploy`. `build` publishes the web host and uploads it as an artifact;
+`smoke` downloads that exact artifact and runs Playwright against it under `/Rayforge/`; `deploy` is a
+reusable workflow that publishes the tested artifact to GitHub Pages only on `main`. The smoke test asserts
+a non-blank, animated canvas, so a link or bridge regression fails before deployment.
+
+The size gate (`tests/check-web-size.sh`) records raw, brotli, file-count and native-wasm limits. It exists
+because the official `-O0` link changes the payload, and because a quiet increase in the native archive is
+otherwise easy to miss. The deployment details, static-host requirements and troubleshooting live in
+[DEPLOYMENT.md](DEPLOYMENT.md), not here.
+
 ## UI
 
 Player-facing UI is game-owned and raylib-drawn (or a small managed immediate-mode layer); Blazor owns only
@@ -199,7 +214,8 @@ and the fallback plan are in [UI-STRATEGY.md](UI-STRATEGY.md).
 - No pointer-lock demo: `BrowserMouseCapture` is wired and correct, but the Hello World demo has no
   first-person camera (stretch goal).
 - No streaming/progress asset mode: everything is preloaded before the first frame (Bundled only).
-- No AOT (M5); the Release publish is trimmed, and the `[JSExport]` surface survives it.
+- No AOT by default; the Release publish is trimmed, the `[JSExport]` surface survives it, and AOT is
+  opt-in with measured costs in [spike 0006](spikes/0006-aot.md).
 - No router and no multiple canvases: one raylib context per page, reload to restart.
 - Firefox/Safari unverified (only Chromium is installed on the development machine).
 
@@ -212,7 +228,9 @@ dotnet test Rayforge.slnx
 dotnet run --project games/HelloWorld/HelloWorld.Web        # http://localhost:5xxx
 dotnet run --project games/HelloWorld/HelloWorld.Desktop    # needs a display
 dotnet publish games/HelloWorld/HelloWorld.Web -c Release -o artifacts/hello-world
+./tests/check-web-size.sh                                   # payload budget
 ./tests/template-smoke.sh                                   # packed packages + generated game
+(cd tests/web-smoke && npx playwright test)                 # browser smoke (see DEPLOYMENT.md)
 ```
 
 The publish log must say `Linking with emcc with -O0`, and `artifacts/hello-world/wwwroot/assets/` must contain

@@ -160,7 +160,7 @@ Two failures look like upgrade failures and are not:
 
 | Symptom | Real cause | Action |
 |---|---|---|
-| `wasm-opt: Unknown option '--enable-bulk-memory-opt'` at `-O2` | Emscripten pack ships a Binaryen older than the flag the SDK passes | keep `EmccLinkOptimizationFlag=-O0`; solve in M5; **it is not a raylib problem** |
+| `wasm-opt: Unknown option '--enable-bulk-memory-opt'` at `-O2` | Emscripten pack ships a Binaryen older than the flag the SDK passes | keep `EmccLinkOptimizationFlag=-O0` (the official setting; [spike 0005](spikes/0005-release-wasm-opt.md)); **it is not a raylib problem** |
 | A CRLF/trailing-slash path failure in `NativeFileReference` | MSBuild path normalisation on Windows | use `$(MSBuildThisFileDirectory)` with forward slashes, test on Windows |
 
 Confirm it is the toolchain by running the **old** version through the same failing command. If it fails

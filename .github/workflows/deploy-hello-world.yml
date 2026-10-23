@@ -1,0 +1,65 @@
+name: deploy-hello-world
+
+# Called by ci.yml after build + smoke, so the exact artifact a browser test passed is the one
+# published. GitHub Pages must use "GitHub Actions" as its source; configure-pages enables it when
+# the token is allowed to.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Download the tested web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hello-world-web
+          path: site
+
+      - name: Prepare the Pages artifact
+        run: |
+          set -euo pipefail
+          touch site/.nojekyll
+
+          # GitHub Pages has no SPA fallback. Send unknown paths back to the app root instead of
+          # showing its default 404; <base href="./"> cannot resolve correctly from a missing path.
+          cat >site/404.html <<EOF
+          <!doctype html>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Rayforge - redirecting</title>
+          <meta http-equiv="refresh" content="0; url=/${{ github.event.repository.name }}/">
+          <script>location.replace('/${{ github.event.repository.name }}/');</script>
+          <p><a href="/${{ github.event.repository.name }}/">Open Rayforge</a></p>
+          EOF
+
+          test -s site/index.html
+          test -f site/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

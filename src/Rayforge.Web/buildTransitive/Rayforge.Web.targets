@@ -7,9 +7,26 @@
     <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
     <InvariantGlobalization>true</InvariantGlobalization>
 
-    <!-- Temporary: -O2 makes the native link run wasm-opt with a flag Binaryen 117 does not know
-         (spike 0001, 4.3; unchanged on 8.1.0, spike 0002, 4.4). Owned by M5. -->
+    <!-- Official workaround: -O2 runs wasm-opt with the enable-bulk-memory-opt feature flag, which the
+         Binaryen 117 shipped with the .NET 10 Emscripten pack rejects. The latest 10.0.113 workload
+         still has this mismatch (spike 0005). -O0 skips wasm-opt and is what the published demo uses.
+         Override only after verifying a newer toolchain on a real browser build. -->
     <EmccLinkOptimizationFlag Condition="'$(EmccLinkOptimizationFlag)' == ''">-O0</EmccLinkOptimizationFlag>
   </PropertyGroup>
+
+  <!-- AOT is opt-in (pass -p:RunAOTCompilation=true). Raylib-cs is a very large generated binding;
+       mono-aot-cross crashes while precompiling it on the current .NET 10 toolchain, so keep that one
+       assembly interpreted. The SDK uses the same metadata for Microsoft.JSInterop.WebAssembly. Remove
+       this when the AOT compiler can handle Raylib-cs; see spike 0006. -->
+  <Target Name="RayforgeForceInterpretRaylibForAot"
+          BeforeTargets="_WasmAotCompileApp"
+          Condition="'$(RunAOTCompilation)' == 'true'">
+    <ItemGroup>
+      <_WasmAssembliesInternal Update="@(_WasmAssembliesInternal)"
+                               Condition="'%(Filename)' == 'Raylib-cs'">
+        <AOT_InternalForceToInterpret>true</AOT_InternalForceToInterpret>
+      </_WasmAssembliesInternal>
+    </ItemGroup>
+  </Target>
 
 </Project>

@@ -45,14 +45,14 @@ Proceed / change plan / fall back. What changes in PLAN.md?
 | [0001](0001-raylib-cs-blazor-wasm.md) | Does Raylib-cs 7.0.2 + a vendored `raylib.a` work inside a fresh Blazor WebAssembly app (canvas binding, native link, `[JSExport]` loop, assets, audio, resize)? | M0 | **GO**, with 4 plan corrections |
 | [0002](0002-raylib-cs-8.1.0.md) | Does Raylib-cs 8.1.0's official `browser-wasm` package replace the vendored `raylib.a` and `Raylib.props` cleanly (no undefined symbols, no regressions, smaller payload)? | M0b | **GO.** M1 starts on 8.1.0; raylib 6.0; 6.04 MB / 1.85 MB brotli; M7 closed |
 | [0003](0003-doomfire-port.md) | Can DoomFire-Raylib port onto Rayforge with mechanical changes; does the porting guide hold? | M3 | **GO.** Under ~50 lines of host-specific game changes; MIME + GLSL ES 100 friction recorded |
+| [0005](0005-release-wasm-opt.md) | Can the current toolchain link Release at `-O2`, or should `-O0` become official? | M5 | **FALL BACK.** Binaryen 117 still rejects `enable-bulk-memory-opt`; `-O0` is the official default |
+| [0006](0006-aot.md) | AOT in Release: build time, payload size, runtime stability with the package's raylib archive? | M5 | **OPT-IN.** Works after a Raylib-cs force-interpret workaround; ~5x build, ~2x brotli, no startup win |
 
 ## Planned spikes
 
 | ID | Question | Milestone |
 |---|---|---|
 | 0004 | Pointer lock + mouse delta under `Blazor.runtime.Module['canvas']`; does raylib's `DisableCursor` help at all? | M6 |
-| 0005 | Release publish: the `wasm-opt --enable-bulk-memory-opt` failure (see 0001 section 4.3) - workload update, SDK band, or patched response file? | M5 |
-| 0006 | AOT in Release: build time, payload size, runtime stability with the package's raylib archive. | M5 |
 
 Fit/Fill canvas math was validated as part of M1/M2 unit tests and Hello World acceptance; it no longer needs a
 separate spike ID.

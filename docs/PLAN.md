@@ -1005,9 +1005,9 @@ The framework package (`Rayforge.Web/buildTransitive/Rayforge.Web.targets`) sets
     <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
     <InvariantGlobalization>true</InvariantGlobalization>
 
-    <!-- Temporary: -O2 makes the native link run wasm-opt with a flag Binaryen 117
-         does not know (spike 0001, section 4.3; still true on 8.1.0, spike 0002,
-         section 4.4). Revisit in M5. -->
+    <!-- Official: -O2 makes the native link run wasm-opt with a flag Binaryen 117
+         does not know (spike 0005). The latest .NET 10 workload still pairs them;
+         override only after verifying a newer toolchain on a browser build. -->
     <EmccLinkOptimizationFlag>-O0</EmccLinkOptimizationFlag>
   </PropertyGroup>
 </Project>
@@ -1128,8 +1128,9 @@ Rayforge.Web.0.1.0-preview.1.nupkg
 
 - `dotnet run` uses the Blazor DevServer and works with the asset copy target from M0. Debug is the fast inner
   loop; there is no need to publish for day-to-day work.
-- **Release publish needs `EmccLinkOptimizationFlag=-O0`** until the `wasm-opt`/Binaryen 117 problem is solved
-  (spike 0001, 4.3). The framework props set it, so hosts do not have to.
+- **Release publish uses `EmccLinkOptimizationFlag=-O0` officially** because the current .NET 10 Emscripten
+  pack still ships Binaryen 117 (spike 0005). The framework targets set it, so hosts do not have to. AOT is
+  opt-in; see spike 0006.
 - **Hot reload is disabled for the canvas host.** `dotnet watch` can restart managed code while the native
   raylib window is still initialized, which cannot work. Rebuild + refresh the page. The base should detect
   a second `InitWindow` and show a clear "reload the page" message instead of crashing.
@@ -1247,11 +1248,11 @@ The authoritative tracker, with per-milestone checklists, is [MILESTONES.md](MIL
 | **M2 - Hello World** | Base canvas component, JS bridge, desktop runner, Hello World game + hosts, assets, audio, resize, error/loading overlays. | All Hello World acceptance criteria pass; same game on desktop and web. | **Done 2026-10-21** |
 | **M3 - Real port** | DoomFire port; porting guide validated; shader/MIME friction recorded. | DoomFire runs on web and desktop; friction list written. | **Done 2026-10-21** |
 | **M4 - Template & packages** | `dotnet new rayforge-game`, packable `Rayforge.Core/Web/Desktop`, local feed, docs. | A new game can be created and run from the template without touching the base source. | **Done 2026-10-22** |
-| **M5 - CI & deploy** | GitHub Actions publish, Pages deploy, Playwright smoke test, size/time report, AOT measurement. | Green CI on a clean runner; deployed demo URL; smoke test catches a blank canvas. | Planned |
+| **M5 - CI & deploy** | GitHub Actions publish, Pages deploy, Playwright smoke test, size report, AOT measurement. | Green CI on a clean runner; deployed demo URL; smoke test catches a blank canvas. | **Done 2026-10-23** |
 | **M6 - Wolfrender port** (separate track) | Port Wolfrender onto Rayforge. | Playable in the browser; no Wolfrender-specific code in the base. | Planned |
 
 M0 closed the decision gate; M0b settled the raylib baseline (8.1.0 / raylib 6.0) and absorbed the former M7.
-M1-M4 are closed; M5 (CI and deployment) is the next action.
+M1-M5 are closed; M6 (Wolfrender port) is the next track.
 
 ---
 
@@ -1259,7 +1260,7 @@ M1-M4 are closed; M5 (CI and deployment) is the next action.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Release publish breaks on `wasm-opt --enable-bulk-memory-opt` (Binaryen 117) | **Certain today** | Medium | `EmccLinkOptimizationFlag=-O0` in the framework props; solve properly in M5 (workload update / SDK band / patched rsp). |
+| Release publish breaks on `wasm-opt --enable-bulk-memory-opt` (Binaryen 117) | **Certain today** | Medium | `EmccLinkOptimizationFlag=-O0` is the official setting (spike 0005); re-test after each workload update. |
 | Asset build plumbing is fragile (`Link` -> 0-byte DevServer response) | High | Medium | Copy target before `ResolveStaticWebAssetsInputs` (spike 0001, 4.2); gitignore the generated folder; CI asserts a published asset is non-empty. |
 | A second native archive sneaks in (vendored `.a` or duplicate `NativeFileReference`) | Low | High (link failure or silent ABI trap) | Never commit a native binary; CI greps `emcc-link.rsp` for exactly one `raylib.a`; undefined symbols fail the build (spike 0002, 4.1/4.2). |
 | raylib 6.0 API changes make porting existing games expensive | High for Wolfrender | Medium | The base is already on 8.1.0; adapt Wolfrender in M6 and record the diff; DoomFire in M3 is the small rehearsal. |
@@ -1303,7 +1304,7 @@ Still open (do not block M1):
 | NuGet package IDs (`Rayforge.Core` etc.) - checked free on nuget.org 2026-10-22; not reserved | M4 |
 | Default target browsers (Chrome + Firefox first, Safari best-effort; mobile out of scope?) | M2 |
 | Whether the desktop RIDs other than `linux-x64` load their package natives (Windows, macOS x64/arm64) | M2/M5 |
-| Whether `dotnet workload update` fixes the Release `wasm-opt` failure | M5 |
+| Whether `dotnet workload update` fixes the Release `wasm-opt` failure | **Answered in M5:** no, 10.0.113 still has the mismatch (spike 0005) |
 
 ---
 

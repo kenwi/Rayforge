@@ -1,0 +1,13 @@
+{
+  "name": "rayforge-web-smoke",
+  "private": true,
+  "description": "Browser smoke test for the published Hello World host",
+  "scripts": {
+    "test": "playwright test",
+    "install-browser": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "pngjs": "7.0.0"
+  }
+}

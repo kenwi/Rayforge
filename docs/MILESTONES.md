@@ -15,12 +15,12 @@ Legend: `[x]` done, `[ ]` planned, **(blocked)** needs something external.
 | M2 | Hello World | Base canvas + JS bridge + desktop runner + demo game on both hosts | **Done** - 2026-10-21 |
 | M3 | First real port | DoomFire-Raylib on web and desktop; porting guide validated | **Done** - 2026-10-21 |
 | M4 | Template & packages | `dotnet new` template, packable framework, local feed | **Done** - 2026-10-22 |
-| M5 | CI & deploy | GitHub Actions, Pages deploy, Playwright smoke test, size report | Not started |
+| M5 | CI & deploy | GitHub Actions, Pages deploy, Playwright smoke test, size report | **Done** - 2026-10-23 |
 | M6 | Wolfrender port | Separate track: port Wolfrender onto the base | Not started |
 
 M0 was the decision gate and is closed; M0b settled the raylib baseline and removed the former M7. M1 built the
 skeleton; M2 delivered Hello World; M3 validated the porting guide on DoomFire; M4 made the framework
-packable and added the game template. M5 is the next action.
+packable and added the game template; M5 made the pipeline deploy the tested demo. M6 is the next track.
 
 ---
 
@@ -242,8 +242,8 @@ backend, variadic WASM trap, +~2.31 MB raw at `-O0`) and keeps ImGui out of v1.
 
 **Open:** packages are not published to nuget.org; the template defaults to `../nuget-local` and docs say how
 to point it elsewhere. Package IDs were checked free on nuget.org on 2026-10-22 but are not reserved. Firefox
-and Safari remain unverified (only Chromium installed). M5 still owns CI, deploy, Playwright and the `-O2`
-link fix.
+and Safari remain unverified (only Chromium installed). M5 later added CI, deploy, Playwright and documented
+the `-O0` decision.
 
 **Closed:** 2026-10-22.
 
@@ -254,13 +254,44 @@ link fix.
 **Goal:** a green pipeline that publishes the demo and catches blank-canvas regressions.
 **Exit criteria:** clean-runner build + test + publish + deploy, with a smoke test that would fail on a black canvas.
 
-- [ ] Fix the Release `wasm-opt` failure (spike 0005) or make the workaround official
-- [ ] `ci.yml`: setup-dotnet, `wasm-tools`, restore, build Release, test, publish, assert key output files
-- [ ] `deploy-hello-world.yml`: GitHub Pages, `.nojekyll`, `404.html`, sub-path safe `<base href="./">`
-- [ ] Playwright smoke test: page loads, canvas is non-blank, one frame advances, no console errors
-- [ ] AOT spike (0006): measure build time, payload, runtime; decide opt-in policy
-- [ ] Size/time report in CI (raw + brotli) with a regression threshold
-- [ ] Document the deploy recipe for any static host
+- [x] Fix the Release `wasm-opt` failure (spike 0005) or make the workaround official
+- [x] `ci.yml`: setup-dotnet, `wasm-tools`, restore, build Release, test, publish, assert key output files
+- [x] `deploy-hello-world.yml`: GitHub Pages, `.nojekyll`, `404.html`, sub-path safe `<base href="./">`
+- [x] Playwright smoke test: page loads, canvas is non-blank, one frame advances, no console errors
+- [x] AOT spike (0006): measure build time, payload, runtime; decide opt-in policy
+- [x] Size/time report in CI (raw + brotli) with a regression threshold
+- [x] Document the deploy recipe for any static host
+
+**Notes:** the Release link keeps `-O0` as the official setting. The latest .NET 10 workload (10.0.113,
+Emscripten 3.1.56) still pairs with Binaryen 117, which rejects `enable-bulk-memory-opt`; a newer external
+Binaryen links but the post-link `wasm-opt` step fails validation, and skipping it yields a non-booting app
+([spike 0005](spikes/0005-release-wasm-opt.md)). The defaults live in
+`src/Rayforge.Web/buildTransitive/Rayforge.Web.targets`, so package consumers get the same behaviour.
+
+AOT is opt-in. `mono-aot-cross` crashes precompiling Raylib-cs, so the framework marks that assembly
+`AOT_InternalForceToInterpret` (the SDK's own escape hatch for huge assemblies). With that, AOT builds and
+passes the browser smoke test, but costs ~5x build time, 18.58 MB raw / 4.02 MB brotli versus 6.63 MB /
+2.03 MB, and does not improve startup (669 ms vs 612 ms median). It stays off by default
+([spike 0006](spikes/0006-aot.md)).
+
+**Result:** `ci.yml` is `build -> smoke -> deploy`. Build publishes HelloWorld, asserts the real assets and
+native wasm, checks the payload budget against `tests/web-size-baseline.env`, and uploads the artifact. Smoke
+downloads that artifact, serves it under `/Rayforge/`, and boots it in headless Chromium: start button, no
+overlay, 1280x720 Fit canvas, non-blank colors, motion between two frames, no console/page errors, no failed
+requests. A blank or frozen canvas fails the job. Deploy is a reusable workflow that runs only on `main`
+after both jobs pass, adds `.nojekyll` and a redirecting `404.html`, and publishes the tested artifact via
+GitHub Pages. Pages is enabled with the Actions source.
+
+The payload measured from a clean publish is 6,633,481 raw bytes / 2,032,185 brotli bytes / 55 files /
+2,491,188 native wasm bytes. CI reports publish seconds and the size table in the job summary; the size gate
+has ~10% headroom.
+
+**Open:** Firefox/Safari remain unverified (only Chromium installed). Packages are still local-only; the
+public NuGet IDs are not reserved. AOT has no CI job by design. The `-O2` path needs a future .NET workload
+with Binaryen 118+ before the default can change. The `404.html` redirect hardcodes the repository name, so a
+custom domain needs a one-line change in the workflow.
+
+**Closed:** 2026-10-23.
 
 ---
 

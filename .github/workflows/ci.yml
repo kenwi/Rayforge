@@ -41,7 +41,18 @@ jobs:
       # Rayforge.Web/buildTransitive) only runs here. M1 keeps it in CI so an ABI or flag
       # regression fails before a release.
       - name: Publish Hello World web host
-        run: dotnet publish games/HelloWorld/HelloWorld.Web/HelloWorld.Web.csproj -c Release -o artifacts/hello-world
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          dotnet publish games/HelloWorld/HelloWorld.Web/HelloWorld.Web.csproj -c Release -o artifacts/hello-world
+          elapsed=$(( $(date +%s) - start ))
+          {
+            echo "### Publish timing"
+            echo
+            echo "| Step | Seconds |"
+            echo "|---|---:|"
+            echo "| Publish + native link | $elapsed |"
+          } >>"$GITHUB_STEP_SUMMARY"
 
       - name: Verify web artifact
         run: |
@@ -55,3 +66,78 @@ jobs:
           grep -q 'assets/ui.ttf' artifacts/hello-world/wwwroot/assets/rayforge.assets.json
           ls artifacts/hello-world/wwwroot/_framework/dotnet.native.*.wasm
           echo "web artifact OK"
+
+      - name: Check payload budget
+        run: ./tests/check-web-size.sh artifacts/hello-world/wwwroot
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-world-web
+          path: artifacts/hello-world/wwwroot
+          if-no-files-found: error
+          retention-days: 7
+
+  # A real browser check: the build can be green while the canvas stays black. This test boots
+  # the published app under /Rayforge/ (the Pages sub-path), starts the game, and compares two
+  # frames. It also fails on console errors and 4xx/5xx asset requests.
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/web-smoke/package-lock.json
+
+      - name: Install Playwright
+        working-directory: tests/web-smoke
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Download web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hello-world-web
+          path: artifacts/hello-world/wwwroot
+
+      # Mirror the Pages layout: https://<user>.github.io/<repo>/
+      - name: Prepare sub-path site
+        run: |
+          mkdir -p artifacts/site/Rayforge
+          cp -a artifacts/hello-world/wwwroot/. artifacts/site/Rayforge/
+
+      - name: Browser smoke test
+        working-directory: tests/web-smoke
+        env:
+          CI: "true"
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            tests/web-smoke/playwright-report
+            tests/web-smoke/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Reusable workflow in its own file (M5), called only after the artifact has been built and
+  # smoke-tested in a browser. Pull requests never deploy.
+  deploy:
+    needs: [build, smoke]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-hello-world.yml

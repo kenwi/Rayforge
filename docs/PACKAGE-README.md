@@ -59,6 +59,11 @@ Serve `artifacts/my-game/wwwroot` from any static host that sends `application/w
 `<base href="./" />` if the app lives under a sub-path. The framework's `buildTransitive` targets are applied
 automatically; do not add the wasm flags by hand.
 
+The Release link uses `-O0` officially until the .NET Emscripten pack ships a matching Binaryen. AOT is
+opt-in (`-p:RunAOTCompilation=true`); the framework keeps Raylib-cs interpreted so the current AOT compiler
+does not crash on it. The full host requirements, GitHub Pages recipe and AOT numbers are in
+[the deployment guide](https://github.com/kenwi/Rayforge/blob/main/docs/DEPLOYMENT.md).
+
 ## Documentation
 
 - [Architecture and dependency rules](https://github.com/kenwi/Rayforge/blob/main/docs/ARCHITECTURE.md)
