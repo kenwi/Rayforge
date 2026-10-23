@@ -280,7 +280,7 @@ downloads that artifact, serves it under `/Rayforge/`, and boots it in headless 
 overlay, 1280x720 Fit canvas, non-blank colors, motion between two frames, no console/page errors, no failed
 requests. A blank or frozen canvas fails the job. Deploy is a reusable workflow that runs only on `main`
 after both jobs pass, adds `.nojekyll` and a redirecting `404.html`, and publishes the tested artifact via
-GitHub Pages. Pages is enabled with the Actions source.
+GitHub Pages. Pages is enabled with the Actions source. The first full green run was\n[39909167250](https://github.com/kenwi/Rayforge/actions/runs/39909167250) (build 1m8s, smoke 40s, deploy 13s),\nand the deployed site also passes the smoke test via `SMOKE_URL=https://kenwi.github.io`.
 
 The payload measured from a clean publish is 6,633,481 raw bytes / 2,032,185 brotli bytes / 55 files /
 2,491,188 native wasm bytes. CI reports publish seconds and the size table in the job summary; the size gate

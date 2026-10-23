@@ -87,6 +87,15 @@ To point Playwright at a system browser instead of its own download:
 CHROMIUM_PATH=/usr/bin/chromium npx playwright test
 ```
 
+To run the same checks against the deployed site instead of a local publish:
+
+```bash
+SMOKE_URL=https://kenwi.github.io CHROMIUM_PATH=/usr/bin/chromium npx playwright test
+```
+
+`SMOKE_URL` skips the local static server and navigates to `<origin>/Rayforge/`. This is useful after a
+deploy, and it verifies the real host's MIME types, compression, caching and sub-path resolution.
+
 ## Payload budget
 
 ```bash

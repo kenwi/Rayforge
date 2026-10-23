@@ -1,9 +1,12 @@
 const path = require("node:path");
 const { defineConfig } = require("@playwright/test");
 
+// SMOKE_URL runs the same checks against a deployed site (for example
+// https://kenwi.github.io); SMOKE_ROOT/SMOKE_PORT serve a local publish instead.
+const liveOrigin = process.env.SMOKE_URL;
 const siteRoot = process.env.SMOKE_ROOT || path.resolve(__dirname, "../../artifacts/site/Rayforge");
 const port = Number(process.env.SMOKE_PORT || 4173);
-const baseURL = `http://127.0.0.1:${port}`;
+const baseURL = liveOrigin || `http://127.0.0.1:${port}`;
 
 module.exports = defineConfig({
   testDir: __dirname,
@@ -30,10 +33,12 @@ module.exports = defineConfig({
       ],
     },
   },
-  webServer: {
-    command: `node ${JSON.stringify(path.join(__dirname, "server.js"))} ${JSON.stringify(siteRoot)} ${port}`,
-    url: `${baseURL}/Rayforge/`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-  },
+  webServer: liveOrigin
+    ? undefined
+    : {
+        command: `node ${JSON.stringify(path.join(__dirname, "server.js"))} ${JSON.stringify(siteRoot)} ${port}`,
+        url: `${baseURL}/Rayforge/`,
+        reuseExistingServer: !process.env.CI,
+        timeout: 30_000,
+      },
 });
